@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato&display=swap');
+html,
+body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	font-family: 'Lato', sans-serif;
+}
+body {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+#brand {
+	display: block;
+	position: absolute;
+	top: 0;
+	z-index: 1000;
+	font-size: 26px;
+	color: #ffffff;
+	user-select: none;
+}
+p {
+	padding: 0;
+	margin: 0;
+	user-select: none;
+	overflow-wrap: break-word;
+	overflow: hidden;
+}
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+input[type=number] {
+	-moz-appearance: textfield;
+	text-align: center;
+}
+.lds-dual-ring {
+	position: fixed;
+	z-index: 5000;
+	display: block;
+	margin: 0;
+	width: 100%;
+	height: 100%;
+	backdrop-filter: blur(10px);
+}
+.lds-dual-ring:after {
+	content: " ";
+	display: block;
+	width: 128px;
+	height: 128px;
+	margin: 0;
+	border-radius: 50%;
+	border: 6px solid #fed;
+	border-color: #fed transparent #fed transparent;
+	top: calc(50% - 64px - 6px);
+	left: calc(50% - 64px - 6px);
+	position: relative;
+	animation: lds-dual-ring 1.1s linear infinite;
+}
+@keyframes lds-dual-ring {
+	0% {
+	  transform: rotate(0deg);
+	}
+	100% {
+	  transform: rotate(360deg);
+	}
+}
