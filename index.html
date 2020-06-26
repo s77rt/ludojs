@@ -1,16 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html itemscope itemtype="http://schema.org/WebPage" lang="en" dir="ltr">
 	<head>
-		<title>Ludo</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+		<meta name="robots" content="all">
+		<title>Ludo Online - Play Ludo Game Online and Offline with Friends and Family!</title>
+		<meta name="author" content="Abdelhafidh Belalia - s77rt">
+		<meta name="description" content="Play ludo game online for free. You can play on multiplayer mode with your friends or with random strangers or play on offline mode with your family or with the computer.">
+		<meta name="keywords" content="ludo, online ludo, ludo board game, ludo online, ludo king, ludo king online, io games, ludo io game, ludo.gg, gg games, ludo multiplayer, online ludo game, ludo game online, ludo online with friends, ludo online free, ludo online pc, pachisi, board games, classic games, ludo classic, ludo classic pc, ludo club, ludo club online, online ludo club, ludo game, ludo app">
+		<meta itemprop="name" content="Ludo Online - Play Ludo Game Online and Offline with Friends and Family!">
+		<meta itemprop="description" content="Play ludo game online for free. You can play on multiplayer mode with your friends or with random strangers or play on offline mode with your family or with the computer.">
+		<meta itemprop="image" content="https://ludo.gg/static/browser/og_image.png">
+		<meta property="og:url" content="https://ludo.gg">
+		<meta property="og:type" content="website">
+		<meta property="og:site_name" content="Ludo.gg">
+		<meta property="og:title" content="Ludo Online - Play Ludo Game Online and Offline with Friends and Family!">
+		<meta property="og:description" content="Play ludo game online for free. You can play on multiplayer mode with your friends or with random strangers or play on offline mode with your family or with the computer.">
+		<meta property="og:image" content="https://ludo.gg/static/browser/og_image.png">
+		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:title" content="Ludo Online - Play Ludo Game Online and Offline with Friends and Family!">
+		<meta name="twitter:description" content="Play ludo game online for free. You can play on multiplayer mode with your friends or with random strangers or play on offline mode with your family or with the computer.">
+		<meta name="twitter:image" content="https://ludo.gg/static/browser/og_image.png">
 		<meta name="msapplication-TileColor" content="#9f00a7">
-		<meta name="msapplication-config" content="/static/favicon/browserconfig.xml">
-		<meta name="theme-color" content="#ffffff">
-		<link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
-		<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
-		<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
-		<link rel="manifest" href="/static/favicon/site.webmanifest">
-		<link rel="shortcut icon" href="/static/favicon/favicon.ico">
+		<meta name="msapplication-config" content="/static/browser/browserconfig.xml">
+		<meta name="theme-color" content="#ede574">
+		<link rel="apple-touch-icon" sizes="180x180" href="/static/browser/apple-touch-icon.png">
+		<link rel="icon" type="image/png" sizes="32x32" href="/static/browser/favicon-32x32.png">
+		<link rel="icon" type="image/png" sizes="16x16" href="/static/browser/favicon-16x16.png">
+		<link rel="manifest" href="/static/browser/site.webmanifest">
+		<link rel="shortcut icon" href="/static/browser/favicon.ico">
 		<link href="/static/css/view.css" rel="stylesheet">
 		<link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@3/dark.css" rel="stylesheet">
 	</head>
@@ -21,11 +40,14 @@
 		<script src="https://cdn.jsdelivr.net/npm/seedrandom@3.0.5/seedrandom.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/gsap@3.3.1/dist/gsap.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/pixi.js@5.2.4/dist/pixi.min.js"></script>
-		<script src="https://cdn.jsdelivr.net/npm/pixi-text-input@1.0.5/PIXI.TextInput.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/pixi-particles@4.2.1/dist/pixi-particles.min.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/pixi-sound@3.0.4/dist/pixi-sound.js"></script>
-		<script src="/static/js/game.client.js"></script>
+		<script src="/static/js/game.client.min.js"></script>
 		<script>
+			screen.orientation.lock(screen.orientation.type);
+			if ('serviceWorker' in navigator) {
+				navigator.serviceWorker.register('service-worker.js');
+			}
 			gsap.ticker.lagSmoothing(0);
 			var g = new Game();
 			g.startApp();

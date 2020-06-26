@@ -13,8 +13,8 @@ const BLUE_2 = 0x42a5f5;
 
 const BORDER = 0x000000;
 const BOARD = 0xddffff;
-const BACKGROUND = 0x131836;
-const TEXT = 0xddffff;
+const BACKGROUND = 0xede574;
+const TEXT = 0x111111;
 
 const COLOR_MAP = {
 	0: 0xffffff,
@@ -26,9 +26,19 @@ const COLOR_MAP = {
 
 const SAFE_PATH = [0, 1, 14, 27, 40, 53, 54, 55, 56, 57, 58, 59];
 
+Storage.prototype.setObject = function(key, value) {
+	this.setItem(key, JSON.stringify(value));
+}
+
+Storage.prototype.getObject = function(key) {
+	var value = this.getItem(key);
+	return value && JSON.parse(value);
+}
+
 class Game {
 	constructor() {
-		this.my_seq_id = 0; // 0 is for local
+		this.playername = (localStorage.getItem('playername') || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
+		this.my_seq_id = 1; // 1 is for just for fallback
 		this.player_turn = null;
 		this.busy = false; // for smooth updaes
 		this.funqueue = []; // functions queue
@@ -36,7 +46,7 @@ class Game {
 		this.brand = document.getElementById('brand');
 		this.spinner = new Game_Spinner();
 
-		this.token = '';
+		this.token = Math.random;
 
 		this._socket = io();
 		this._socket.on('OnlinePlayers', this.onOnlinePlayers.bind(this));
@@ -55,6 +65,7 @@ class Game {
 			this.funqueue.push(function() {this.onGameUpdate(data)}.bind(this));
 			this.process_funqueue();
 		}.bind(this));
+		this._socket.on('GameError', this.onGameError.bind(this));
 
 		this._socket.on('Message', this.onMessage.bind(this));
 	}
@@ -78,37 +89,227 @@ class Game {
 		this._socket.emit('OnlinePlayers');
 	}
 
+	LocalServer(playing_again) {
+		this._localPaused = 0;
+		this._localBots = [];
+		let c = async function(playing_again) {
+			if (playing_again === true) {
+				var Players = this._localPlayers;
+			} else {
+				var { value: Players } = await Swal.fire({
+				  title: 'Players',
+				  confirmButtonText: 'Play',
+				  html:
+					'Click to Switch Player Status<br><br>'+
+					'<div class="d-flex">'+
+					'<div class="playerconfig"><button id="swal-player1" data-player="1" data-status="{none}" class="playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[1].toString(16).padStart(6, '0')+'">Not Playing</button></div>'+
+					'<div class="playerconfig"><button id="swal-player2" data-player="2" data-status="{none}" class="playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[2].toString(16).padStart(6, '0')+'">Not Playing</button></div>'+
+					'<div class="playerconfig"><button id="swal-player4" data-player="4" data-status="{none}" class="playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[4].toString(16).padStart(6, '0')+'">Not Playing</button></div>'+
+					'<div class="playerconfig"><button id="swal-player3" data-player="3" data-status="{none}" class="playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[3].toString(16).padStart(6, '0')+'">Not Playing</button></div>'+
+					'</div>'+
+					'<br>Players Names<br>'+
+					'<input value="Not Playing" disabled="disabled" id="swal-player1-settings" data-player="1" class="swal2-input player" style="text-align:center;margin:.5em auto;border-color: #'+COLOR_MAP[1].toString(16).padStart(6, '0')+'" type="text" maxlength="15" placeholder="Enter Player 1 Name...">'+
+					'<input value="Not Playing" disabled="disabled" id="swal-player2-settings" data-player="2" class="swal2-input player" style="text-align:center;margin:.5em auto;border-color: #'+COLOR_MAP[2].toString(16).padStart(6, '0')+'" type="text" maxlength="15" placeholder="Enter Player 2 Name...">'+
+					'<input value="Not Playing" disabled="disabled" id="swal-player4-settings" data-player="4" class="swal2-input player" style="text-align:center;margin:.5em auto;border-color: #'+COLOR_MAP[4].toString(16).padStart(6, '0')+'" type="text" maxlength="15" placeholder="Enter Player 4 Name...">'+
+					'<input value="Not Playing" disabled="disabled" id="swal-player3-settings" data-player="3" class="swal2-input player" style="text-align:center;margin:.5em auto;border-color: #'+COLOR_MAP[3].toString(16).padStart(6, '0')+'" type="text" maxlength="15" placeholder="Enter Player 3 Name...">',
+				  focusConfirm: false,
+				  onBeforeOpen: () => {
+					const content = Swal.getContent();
+					if (content) {
+						const buttons = content.querySelectorAll('button');
+						buttons.forEach(function(button) {
+							button.addEventListener("click", function(){
+								let player_seq_id = button.dataset.player;
+								let player_data = localStorage.getObject('player'+player_seq_id);
+								let player_data_name;
+								if (player_data) {
+									player_data_name = (player_data.name || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+player_seq_id;
+								} else {
+									player_data_name = 'Player'+player_seq_id;
+								}
+								const player = content.querySelector('input[data-player="'+player_seq_id+'"]');
+								switch(button.dataset.status) {
+									case "{none}":
+										localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: false});
+										button.dataset.status = "{player}";
+										button.innerText = player_data_name;
+										button.style.opacity = 1;
+										player.disabled = false;
+										player.value = player_data_name;
+										break;
+									case "{player}":
+										localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: true});
+										button.dataset.status = "{bot}";
+										button.innerText = "[ BOT ]";
+										button.style.opacity = 1;
+										player.disabled = true;
+										player.value = "[ BOT ]";
+										break;
+									case "{bot}":
+										localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: false});
+										button.dataset.status = "{none}";
+										button.innerText = "Not Playing";
+										button.style.opacity = 0.5;
+										player.disabled = true;
+										player.value = "Not Playing";
+										break;
+								}
+							});
+						});
+
+						const players = content.querySelectorAll('.player');
+						players.forEach(function(player) {
+							let player_seq_id = player.dataset.player;
+							let player_data_name;
+							player.addEventListener("input", function() {
+								player_data_name = player.value.replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+player_seq_id;
+								player.value = player_data_name;
+								const button = content.querySelector('button[data-player="'+player_seq_id+'"]');
+								button.innerText = player_data_name;
+								localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: false});
+							});
+						});
+					}
+				  },
+				  preConfirm: () => {
+					let available_players = [];
+					let player1_status = document.getElementById('swal-player1').dataset.status;
+					let player2_status = document.getElementById('swal-player2').dataset.status;
+					let player3_status = document.getElementById('swal-player3').dataset.status;
+					let player4_status = document.getElementById('swal-player4').dataset.status;
+					let players_status = [player1_status, player2_status, player3_status, player4_status];
+					players_status.forEach(function(player_status, index){
+						if (player_status != "{none}")
+							available_players.push(index+1);
+					});
+					if (available_players.length > 1) {
+						return available_players;
+					} else {
+						Swal.fire(
+						  'Oops!',
+						  'At least two players are required to play the game',
+						  'error'
+						);
+						this.loadMainMenu();
+					}
+				  }
+				});
+			}
+
+			if (Players) {
+				this.spinner.show();
+				this.player_turn = null;
+				this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
+				this._localPlayers = Players; // Save in case of playing_again
+				this.onLocalServer();
+				Players.forEach(function(player_seq_id) {
+					let player_data = localStorage.getObject('player'+player_seq_id);
+					let player_data_isbot, player_data_name;
+					if (player_data) {
+						player_data_isbot = player_data.isbot;
+						if (player_data_isbot === true) {
+							player_data_name = 'BOT_'+player_seq_id;
+							this._localBots.push(player_seq_id);
+						} else {
+							player_data_name = (player_data.name || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+player_seq_id;
+						}
+					} else {
+						player_data_isbot = false;
+						player_data_name = 'Player'+player_seq_id;
+					}
+					this.Players[player_seq_id].updateInfo(player_data_name, 0);
+				}, this);
+			} else {
+				this.loadMainMenu();
+			}
+		}.bind(this)(playing_again);
+	}
+	NextPlayerTurn() {
+		if (!this._isLocal)
+			return;
+		let players_that_are_still_playing = 0;
+		let next_player = null;
+		var tmp_next_player = this.player_turn;
+		var checks = 0;
+		while(checks < 4) {
+			tmp_next_player = tmp_next_player === 4 ? 1 : tmp_next_player+1;
+			if (this.Players[tmp_next_player].name.length && this.Players[tmp_next_player].percentage != 100) {
+				if (!next_player) {
+					next_player = tmp_next_player;
+				}
+				players_that_are_still_playing++;
+			}
+			checks++;
+		}
+		if (next_player && players_that_are_still_playing > 1) {
+			this.player_turn = next_player;
+			this.my_seq_id = this.player_turn;
+		} else {
+			this.player_turn = -1;
+		}
+	}
+
 	AutoServer() {
 		this.spinner.show();
 		this.player_turn = null;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
-		this._socket.emit('AutoServer', this._mainmenu._playername.text);
+		this._socket.emit('AutoServer', this.playername);
 	}
-	JoinServer(id) {
+	JoinServer(id, or_host) {
 		this.spinner.show();
 		this.player_turn = null;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
-		this._socket.emit('JoinServer', id, this._mainmenu._playername.text);
+		this._socket.emit('JoinServer', id, this.playername, or_host);
 	}
 	HostServer(isPrivate) {
 		this.spinner.show();
 		this.player_turn = null;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
 		isPrivate = (isPrivate === true) ? true : false;
-		this._socket.emit('HostServer', isPrivate, this._mainmenu._playername.text);
+		this._socket.emit('HostServer', isPrivate, this.playername);
 	}
 	LeaveServer() {
+		this.my_seq_id = 1;
 		this.player_turn = null;
+		this.funqueue = [];
+		this.busy = false;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
 		this._socket.emit('LeaveServer');
 	}
 
 	StartGame() {
 		this.spinner.show();
-		this._socket.emit('StartGame');
+		if (this._isLocal) {
+			this.player_turn = Math.floor(Math.random() * 4) + 1;
+			this.NextPlayerTurn();
+			this.onServerUpdate({players_data: {}, playing: true, player_turn: this.player_turn});
+		} else {
+			this._socket.emit('StartGame');
+		}
 	}
 	UpdateGame(action) {
-		this._socket.emit('UpdateGame', action);
+		if (!this._isLocal)
+			this._socket.emit('UpdateGame', action);
+	}
+	PauseGame() {
+		if (!this._isLocal)
+			return;
+		this._localPaused = 1;
+		this._chat.addMessage("Game will be paused in the next turn", 0);
+		Swal.fire({
+			text: "The game will be paused after the current player's turn",
+			position: 'top-end',
+			toast: true,
+			showConfirmButton: false
+		})
+	}
+	ResumeGame() {
+		if (!this._isLocal)
+			return;
+		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['pause'];
+		this._localPaused = 0;
+		this._chat.addMessage("Game Resumed", 0);
+		this.onServerUpdate(this._localLastServerUpdate);
 	}
 
 	Message(msg) {
@@ -119,18 +320,22 @@ class Game {
 		this._onlineplayers.text = 'Online Players: '+n;
 	}
 
+	onLocalServer() {
+		this.spinner.hide();
+		this.loadBoard(true, true);
+		this._chat.addMessage("This is an offline server", 0);
+	}
+
 	onJoinServer(data) {
 		this.spinner.hide();
-		console.log("JoinServer", data);
 		this.my_seq_id = data.seq_id;
-		this.loadBoard(data.isPrivate);
+		this.loadBoard(data.isPrivate, false);
 		this._chat.addMessage("You are a guest", 0);
 	}
 	onHostServer(data) {
 		this.spinner.hide();
-		console.log("HostServer", data);
 		this.my_seq_id = data.seq_id;
-		this.loadBoard(data.isPrivate);
+		this.loadBoard(data.isPrivate, false);
 		this._chat.addMessage("You are the host", 0);
 		if (data.isPrivate === true) {
 			const server_id = data.server_id;
@@ -148,13 +353,14 @@ class Game {
 		}
 	}
 	onLeaveServer(bool) {
-		this.my_seq_id = 0;
-		console.log("LeaveServer", bool);
+		this.my_seq_id = 1;
+		this.player_turn = null;
+		this.funqueue = [];
+		this.busy = false;
 	}
 
 	onServerUpdate(data) {
 		this.spinner.hide();
-		console.log("ServerUpdate", data);
 		this.token = new Math.seedrandom(data.token);
 		for (let [seq_id, player_data] of Object.entries(data.players_data)) {
 			let player = this.Players[seq_id];
@@ -172,33 +378,108 @@ class Game {
 				this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['pause'];
 				PIXI.Loader.shared.resources.game_started.sound.play();
 			}
-			if (this.player_turn === this.my_seq_id) {
-				dice.interactive = true;
-				let x_overflow_left = dice.x - dice.width/2 < 0;
-				let x_overflow_right = dice.x + dice.width/2 > 15*dice._board._BoxSize;
-				let x_overflow = x_overflow_left || x_overflow_right;
-
-				let y_overflow_up = dice.y - dice.height/2 < 0;
-				let y_overflow_down = dice.y + dice.height/2 > 15*dice._board._BoxSize;
-				let y_overflow = y_overflow_up || y_overflow_down;
-
-				if (x_overflow)
-					dice.x = (dice._board.width / 2) - dice._board._BoxSize/2;
-				if (y_overflow)
-					dice.y = (dice._board.height / 2) - dice._board._BoxSize/2;
-
-				this._chat.addMessage("Your turn now", 0);
-			} else if (this.player_turn === -1) {
+			if (this.player_turn === -1) {
 				setTimeout(() => {
+					if (dice.tint === 0x000000)
+						return;
 					this._chat.addMessage("Game Over", 0);
 					PIXI.Loader.shared.resources.game_over.sound.play();
 					dice.changeColor(0x000000);
+					if (!this._isPrivate) {
+						Swal.fire({
+						  title: 'Another match?',
+						  icon: 'question',
+						  allowOutsideClick: false,
+						  allowEscapeKey: false,
+						  showCancelButton: true,
+						  confirmButtonText: 'Yes, Please',
+						  cancelButtonText: 'No, Thanks',
+						}).then((result) => {
+							if (result.value) {
+								this.AutoServer();
+							} else {
+								this.LeaveServer();
+								this.loadMainMenu();
+							}
+						});
+					} else if (this._isLocal) {
+						Swal.fire({
+						  title: 'Play again?',
+						  icon: 'question',
+						  allowOutsideClick: false,
+						  allowEscapeKey: false,
+						  showCancelButton: true,
+						  confirmButtonText: 'Yes, Please',
+						  cancelButtonText: 'No, Thanks',
+						}).then((result) => {
+							if (result.value) {
+								this.LocalServer(true);
+							} else {
+								this.loadMainMenu();
+							}
+						});
+					} else {
+						Swal.fire({
+						  title: 'Match again?',
+						  icon: 'question',
+						  allowOutsideClick: false,
+						  allowEscapeKey: false,
+						  showCancelButton: true,
+						  confirmButtonText: 'Yes, Please',
+						  cancelButtonText: 'No, Thanks',
+						}).then((result) => {
+							if (result.value) {
+								this.JoinServer((data.id > 999999) ? data.id+1 : data.id*10, true);
+							} else {
+								this.LeaveServer();
+								this.loadMainMenu();
+							}
+						});
+					}
 				}, (0.07*6*1000 * 2)); // just to be sure that the last steps are made
-			} else {
-				this._chat.addMessage("Waiting for "+data.players_data[data.player_turn].name, 0);
+			} else if (this.player_turn > 0 && this.player_turn < 5) {
+				if (this._isLocal && this._localPaused === 1) {
+					this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
+					this._localPaused = 2;
+					this._chat.addMessage("Game Paused", 0);
+					Swal.fire({
+						icon: "info",
+						text: "Game Paused",
+						confirmButtonText: "Resume ▶"
+					}).then((result) => {
+						if (result.value) {
+							this.ResumeGame();
+						}
+					});
+					this._localLastServerUpdate = data; // save this data to be used on game resume
+					return;
+				}
+				dice.changeColor(COLOR_MAP[this.player_turn]);
+				this.Players[this.player_turn].BringMyPiecesUpFront();
+				if (this.player_turn === this.my_seq_id) {
+					dice.setInteractive(true);
+					let x_overflow_left = dice.x - dice.width/2 < 0;
+					let x_overflow_right = dice.x + dice.width/2 > 15*dice._board._BoxSize;
+					let x_overflow = x_overflow_left || x_overflow_right;
+
+					let y_overflow_up = dice.y - dice.height/2 < 0;
+					let y_overflow_down = dice.y + dice.height/2 > 15*dice._board._BoxSize;
+					let y_overflow = y_overflow_up || y_overflow_down;
+
+					if (x_overflow)
+						dice.x = (dice._board.width / 2) - dice._board._BoxSize/2;
+					if (y_overflow)
+						dice.y = (dice._board.height / 2) - dice._board._BoxSize/2;
+
+					if (this._isLocal) {
+						this._chat.addMessage(this.Players[this.player_turn].name+" turn now", 0);
+					} else {
+						this._chat.addMessage("Your turn now", 0);
+					}
+				} else {
+					this._chat.addMessage("Waiting for "+this.Players[this.player_turn].name, 0);
+				}
 			}
-			dice.changeColor(COLOR_MAP[this.player_turn]);
-			this.Players[this.player_turn].BringMyPiecesUpFront();
 		} else {
 			this.player_turn = null;
 			this._chat.addMessage("Waiting for "+(data.max_players-data.players)+" players", 0);
@@ -214,23 +495,30 @@ class Game {
 		  `${error}`,
 		  'error'
 		)
-		console.log("Server error", error);
 	}
 
 	onGameUpdate(action) {
-		console.log("GameUpdate", action);
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
 				this._board._Dice._rotationdirection = data.rotationdirection;
 				this._board._Dice._power = data.power;
-				this._board._Dice._acceleration = data.acceleration;
+				this._board._Dice._acceleration.x = (data.acceleration ? data.acceleration.x || 0 : 0);
+				this._board._Dice._acceleration.y = (data.acceleration ? data.acceleration.y || 0 : 0);
 				this._board._Dice.roll(action.data.number, false);
 				break;
 			case "move":
 				this.Players[data.player].Pieces[data.piece].move_alt(data.old_pos, data.new_pos);
 				break;
 		}
+	}
+	onGameError(error) {
+		this.spinner.hide();
+		Swal.fire(
+		  'Sorry',
+		  `${error}`,
+		  'error'
+		)
 	}
 
 	onMessage(msg) {
@@ -245,7 +533,8 @@ class Game {
 			autoDensity: true,
 			antialias: true,
 			forceFXAA: true,
-			backgroundColor: BACKGROUND,
+			powerPreference: 'high-performance',
+			transparent: true
 		});
 		this._app.ROUND_PIXELS = true;
 		document.body.appendChild(this._app.view);
@@ -262,9 +551,8 @@ class Game {
 		this._app.stage.addChild(loader_progress);
 
 		const loader = PIXI.Loader.shared;
-		loader.add('backgrounds', '/static/resources/images/backgrounds.json')
+		loader.add('piece', '/static/resources/images/piece.json')
 			  .add('icons', '/static/resources/images/icons.json')
-			  .add('piece', '/static/resources/images/piece.json')
 			  .add('dice', '/static/resources/images/dice.json')
 			  .add('logo', '/static/resources/images/logo.png')
 			  .add('flame', '/static/resources/images/flame.png')
@@ -273,7 +561,7 @@ class Game {
 			  .add('notification', '/static/resources/sounds/notification.wav')
 			  .add('move', '/static/resources/sounds/move.wav')
 			  .add('victory', '/static/resources/sounds/victory.wav')
-			  .add('winner', '/static/resources/sounds/winner.wav')
+			  .add('winning', '/static/resources/sounds/winning.wav')
 			  .add('roll_dice', '/static/resources/sounds/roll_dice.wav')
 			  .add('rolled_dice', '/static/resources/sounds/rolled_dice.wav')
 			  .add('first_step', '/static/resources/sounds/first_step.wav')
@@ -283,24 +571,67 @@ class Game {
 		loader.onComplete.add(() => {this._startApp()});
 	}
 	_startApp() {
-		this._bg1 = new PIXI.Sprite(PIXI.Loader.shared.resources.backgrounds.textures.bg1, this._app.screen.width, this._app.screen.height);
-		this._bg1.scale.set(this._app.screen.width/1920, this._app.screen.height/1080);
-
-		this._bg2 = new PIXI.Sprite(PIXI.Loader.shared.resources.backgrounds.textures.bg2, this._app.screen.width, this._app.screen.height);
-		this._bg2.scale.set(this._app.screen.width/1920, this._app.screen.height/1080);
-
 		this._onlineplayers = new PIXI.Text('', {fontFamily : 'Lato', fontSize: this._uSize/40, fill : TEXT, align : 'center'});
 		this._onlineplayers.x = 10;
 		this._onlineplayers.y = this._app.screen.height - (this._onlineplayers.height + 10);
 
-		this._info = new PIXI.Text('v0.1.0', {fontFamily : 'Lato', fontSize: this._uSize/40, fill : TEXT, align : 'center'});
+		this._info = new PIXI.Text('@s77rt', {fontFamily : 'Lato', fontSize: this._uSize/40, fill : TEXT, align : 'center'});
+		this._info.interactive = true;
+		this._info.buttonMode = true;
+		this._info.on('pointerdown', function() {
+			Swal.fire({
+				title: "Feedback",
+				html: 'Enjoy the game? Share it :)<br><br>For feedback kindly reach me by:<br><a href="mailto:admin@abdelhafidh.com" style="color: #dddddd">Email</a> or <a href="https://t.me/s77rt" style="color: #dddddd" target="_blank">Telegram</a><br><br><br><br>All rights reserved &copy; - s77rt',
+				confirmButtonText: "Cool, Thanks"
+			});
+		})
 		this._info.x = this._app.screen.width - (this._info.width + 10);
 		this._info.y = this._app.screen.height - (this._info.height + 10);
+
+		this._settings = new PIXI.Text('⚙ Settings', {fontFamily : 'Lato', fontSize: this._uSize/40, fill : TEXT, align : 'center'});
+		this._settings.interactive = true;
+		this._settings.buttonMode = true;
+		this._settings.on('pointerdown', function() {
+			Swal.fire({
+			  title: "Settings",
+			  html:
+				'Volume ( <span id="volume">100</span>% )<br>'+
+				'<div class="slidecontainer"><input id="swal-volume-settings" class="swal2-range slider" min="0" max="1" step="0.01" value="1" type="range"></div>'+
+				'<br>Player Name<br>'+
+				'<input id="playername" type="text" class="swal2-input" placeholder="Your name...">',
+			onBeforeOpen: () => {
+				const content = Swal.getContent();
+				if (content) {
+					const volume = content.querySelector('#volume');
+					volume.innerText = Math.floor(PIXI.sound.volumeAll*100);
+					const volume_controller = content.querySelector('#swal-volume-settings');
+					volume_controller.value = PIXI.sound.volumeAll;
+					volume_controller.addEventListener("input", function() {
+						PIXI.sound.volumeAll = volume_controller.value;
+						volume.innerText = Math.floor(PIXI.sound.volumeAll*100);
+					});
+
+					const playername = content.querySelector('#playername');
+					playername.value = (localStorage.getItem('playername') || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
+					playername.addEventListener("input", function(){
+						let name = playername.value.replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
+						playername.value = name;
+						localStorage.setItem('playername', name);
+						this.playername = name;
+					}.bind(this));
+				}
+			},
+			  confirmButtonText: "Looks Great"
+			});
+		}.bind(this));
+		this._settings.x = this._app.screen.width - (this._settings.width + 10);
+		this._settings.y = 10;
 
 		this._mainmenu = new Game_MainMenu(this);
 		this._board = new Game_Board(this);
 		this._control = new Game_Control(this);
 		this._chat = new Game_Chat(this);
+		this._banner = new Game_Banner(this);
 
 		this.Players = {
 			1: new Game_Player(this, 1),
@@ -309,26 +640,37 @@ class Game {
 			4: new Game_Player(this, 4)
 		}
 		this._isPrivate = false;
+		this._isLocal = false;
+		this._localPaused = 0; // 0: not paused, 1: pause requested, 2: paused
+		this._localLastServerUpdate = {};
+		this._localPlayers = [];
+		this._localBots = [];
 
 		this.loadMainMenu();
 	}
 	loadMainMenu() {
 		this._chat.hide();
 		this._chat.reset();
+		this._banner.hide();
+		this._banner.reset();
+		this._board.reset();
 		this._app.stage.removeChildren();
 		this._mainmenu.interactiveChildren = true;
-		this._app.stage.addChild(this._bg1, this._onlineplayers, this._info, this._mainmenu);
+		this._app.stage.addChild(this._onlineplayers, this._info, this._settings, this._mainmenu);
 		this.OnlinePlayers();
 		this.brand.style.display = "block";
 	}
-	loadBoard(isPrivate) {
+	loadBoard(isPrivate, isLocal) {
 		this.brand.style.display = "none";
 		this._app.stage.removeChildren();
 		this._isPrivate = isPrivate;
+		this._isLocal = isLocal;
 		this._board.reset();
-		this._app.stage.addChild(this._bg2, this._control, this._board);
+		this._app.stage.addChild(this._control, this._board);
 		this._chat.reset();
 		this._chat.show();
+		this._banner.reset();
+		this._banner.show();
 	}
 }
 
@@ -380,7 +722,22 @@ class Game_Chat {
 		let color = COLOR_MAP[source].toString(16).padStart(6, '0');
 		if (source === 0)  {
 			person = "System";
-			msg = msg.replace(/^You /, '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">You </span>');
+			if (this._game.player_turn > 0) {
+				let current_player = this._game.Players[this._game.player_turn].name;
+				if (this._game._isLocal) {
+					if (msg.startsWith(current_player+' ')) {
+						msg = msg.replace(current_player+' ', '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">'+current_player+' </span>');
+					}
+				} else {
+					if (msg.startsWith('You ')) {
+						msg = msg.replace('You ', '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">You </span>');
+					} else if (msg.startsWith('Your ')) {
+						msg = msg.replace('Your ', '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">Your </span>');
+					} else if (msg.endsWith(current_player)) {
+						msg = msg.replace(current_player, '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">'+current_player+'</span>');
+					}
+				}
+			}
 		} else {
 			person = this._game.Players[source].name;
 		}
@@ -390,12 +747,59 @@ class Game_Chat {
 	}
 }
 
+class Game_Banner {
+	constructor(game) {
+		this._game = game;
+
+		this._box = document.createElement('p');
+
+		var x, y, box_width, box_height;
+		if (this._game._isPortrait) {
+			x = this._game._control._quit.x + this._game._control._quit.width + this._game._board._BoxSize/2;
+			y = 0;
+			this._box.style.top = y+'px';
+			this._box.style.left = x+'px';
+			box_width = this._game._control._play.x - (this._game._control._quit.x + this._game._control._quit.width) - (2*this._game._board._BoxSize/2);
+			box_height = (this._game._app.screen.height - (15*this._game._board._BoxSize + 2*this._game._board._BoxSize))/2;
+		} else {
+			x = 0;
+			y = this._game._control._quit.y + this._game._control._quit.height + this._game._board._BoxSize/2;
+			this._box.style.top = y+'px';
+			this._box.style.left = x+'px';
+			box_width = (this._game._app.screen.width - (15*this._game._board._BoxSize + 2*this._game._board._BoxSize))/2;
+			box_height = this._game._control._mute.y - (this._game._control._quit.y + this._game._control._quit.height) - (2*this._game._board._BoxSize/2);
+		}
+
+		this._box.style.position = 'absolute';
+		this._box.style.background = 'black';
+		this._box.style.color = '#dddddd';
+		this._box.style.fontSize = (box_width/20)+'px';
+		this._box.style.width = box_width+'px';
+		this._box.style.height = box_height+'px';
+		this._box.style.zIndex = 100;
+		this._box.style.display = "none";
+		this._box.style.textAlign = "center";
+		this._box.innerHTML = "Advertisement";
+		document.body.appendChild(this._box);
+	}
+	reset() {
+		return;
+		//this._box.innerHTML = "";
+	}
+	show() {
+		this._box.style.display = "block";
+	}
+	hide() {
+		this._box.style.display = "none";
+	}
+}
+
 class Game_Control extends PIXI.Container {
 	constructor(game) {
 		super();
 		this._game = game;
 
-		this._gohome = new Game_Control_Button(this, "exit", function() {
+		this._quit = new Game_Control_Button(this, "exit", function() {
 			Swal.fire({
 			  title: 'Are you sure you want to quit?',
 			  icon: 'question',
@@ -405,22 +809,33 @@ class Game_Control extends PIXI.Container {
 			  confirmButtonColor: '#d33',
 			}).then((result) => {
 				if (result.value) {
-					this.LeaveServer();
+					if (!this._isLocal)
+						this.LeaveServer();
 					this.loadMainMenu();
 				}
 			});
 		}.bind(game));
-		this._gohome.x = this._game._board._BoxSize/2;
-		this._gohome.y = this._game._board._BoxSize/2;
-		this.addChild(this._gohome);
+		this._quit.x = this._game._board._BoxSize/2;
+		this._quit.y = this._game._board._BoxSize/2;
+		this.addChild(this._quit);
 
 		this._play = new Game_Control_Button(this, "play", function() {
 			if (this._game.player_turn) {
-				Swal.fire(
-				  'Not allowed',
-				  'The current match cannot be paused',
-				  'error'
-				)
+				if (this._game._isLocal) {
+					if (this._game._localPaused === 2) {
+						this._game.ResumeGame();
+					} else if (this._game._localPaused === 0) {
+						this._game.PauseGame(); 
+					}
+				} else {
+					Swal.fire(
+					  'Not allowed',
+					  'The current match cannot be paused',
+					  'error'
+					)
+				}
+			} else if (this._game._isLocal) {
+				this._game.StartGame();
 			} else {
 				Swal.fire({
 				  title: 'The table is not full',
@@ -460,9 +875,9 @@ class Game_Control extends PIXI.Container {
 				  showCancelButton: true,
 				  confirmButtonText: 'Send',
 				  inputValidator: (value) => {
-				  	value = value.replace(/[^\w\s]/gi, '').trim();
+					value = value.replace(/[^\w\s]/gi, '').trim();
 					if (!value) {
-					  return 'You need to write something!';
+						return 'You need to write something!';
 					} else if (value.length > 128) {
 						return 'Your message is too long (> 128)';
 					}
@@ -471,8 +886,8 @@ class Game_Control extends PIXI.Container {
 				msg = msg || '';
 				msg = msg.replace(/[^\w\s]/gi, '').trim().substring(0, 128);
 				if (msg.length) {
-					console.log(msg);
-					this.Message(msg);
+					if (!this._isLocal)
+						this.Message(msg);
 					this._chat.addMessage(msg, this.my_seq_id);
 				}
 			} else {
@@ -486,7 +901,6 @@ class Game_Control extends PIXI.Container {
 		this._chat.x = (this._game._app.screen.width - this._mute.width) - this._game._board._BoxSize/2;
 		this._chat.y = (this._game._app.screen.height - this._chat.height) - this._game._board._BoxSize/2;
 		this.addChild(this._chat);
-
 	}
 }
 class Game_Control_Button extends PIXI.Sprite {
@@ -500,7 +914,7 @@ class Game_Control_Button extends PIXI.Sprite {
 		this._action = action;
 
 		this.on('pointerover', function() {
-			this.tint = 0xfff500;
+			this.tint = 0xc6ffdd;
 		});
 		this.on('pointerout', function() {
 			this.tint = 0xffffff;
@@ -521,18 +935,16 @@ class Game_MainMenu extends PIXI.Container {
 
 		this._logo = new PIXI.Sprite(PIXI.Loader.shared.resources.logo.texture);
 		this._logo.scale.set(1.2*0.9, 1.2*0.8);
-		this._logo.x = this._logo.width/4;
+		this._logo.x = (290/2) - this._logo.width/2;
 		this.addChild(this._logo);
-
-		this.addPlayerInput("Your name...", localStorage.getItem('playername') || "Player"+random_number());
 
 		this._numberOfButtons = 0;
 
-		this.addButton("Play Online", this._game.AutoServer.bind(this._game));
-		this.addButton("Play Private (HOST)", function() {
+		this.addButton("🌐 Play Public", this._game.AutoServer.bind(this._game));
+		this.addButton("👑 Host Private", function() {
 			this.HostServer(true);
 		}.bind(this._game));
-		this.addButton("Play Private (JOIN)", async function() {
+		this.addButton("🎩 Join Private", async function() {
 			const { value: server_id } = await Swal.fire({
 			  title: 'Please enter table id',
 			  input: 'number',
@@ -548,24 +960,16 @@ class Game_MainMenu extends PIXI.Container {
 			else
 				this._mainmenu.interactiveChildren = true;
 		}.bind(this._game));
+		this.addButton("🔌 Play Offline", this._game.LocalServer.bind(this._game));
 
 		this.scale.y = 0.8*(this._game._app.screen.height/this.height);
-		this.scale.x = 0.9*this.scale.y
+		this.scale.x = 0.9*this.scale.y;
 		this.x = (this._game._app.screen.width / 2) - (this.width / 2);
 		this.y = (this._game._app.screen.height / 2) - (this.height / 2);
 	}
-	addPlayerInput(placeholder, default_text) {
-		this._playername = new Game_Input(this, placeholder, default_text);
-		this._playername.y = this._logo.y+this._logo.height+this._playername.height+40;
-		this._playername.on('input', text => {
-			this._playername.text = text.replace(/[^\w]/gi, '').trim().substring(0, 15);
-			localStorage.setItem('playername', this._playername.text);
-		});
-		this.addChild(this._playername);
-	}
 	addButton(text, action) {
 		let button = new Game_MainMenu_Button(this, text, action);
-		button.y = 1.75*this._playername.height+this._playername.y + (1.25*50 * this._numberOfButtons);
+		button.y = 1.5*(this._logo.height)+(this._logo.y)+(1.25*50 * this._numberOfButtons);
 		this._numberOfButtons++;
 		this.addChild(button);
 	}
@@ -576,7 +980,6 @@ class Game_MainMenu_Button extends PIXI.Container {
 		this._mainmenu = mainmenu;
 
 		this._buttonText = new PIXI.Text(text, {fontFamily : 'Lato', fontSize: 26, fill : TEXT, align : 'center'});
-		this._buttonText.cacheAsBitmap = true;
 
 		this._buttonFrame = new PIXI.Graphics();
 		this._buttonFrame.lineStyle(1, TEXT);
@@ -597,35 +1000,11 @@ class Game_MainMenu_Button extends PIXI.Container {
 			this._buttonFrame.alpha = 1;
 		});
 		this.on('pointerdown', function() {
-			this._buttonFrame.alpha = 0.5;
-			this._mainmenu._playername.blur();
 			this._mainmenu.interactiveChildren = false;
 			this._action();
 		});
 
 		this.addChild(this._buttonFrame, this._buttonText);
-	}
-}
-class Game_Input extends PIXI.TextInput {
-	constructor(game, placeholder, default_text) {
-		super({
-			input: {
-				fontSize: '20px',
-				textAlign: 'center',
-				padding: '10px',
-				width: '270px',
-				color: '#dcdcdc'
-			},
-			box: {
-				default: {fill: 0x111111, rounded: 0, stroke: {color: 0xffffff, width: 1}},
-				focused: {fill: 0x111111, rounded: 0, stroke: {color: 0xdddddd, width: 1}},
-				disabled: {fill: 0xDBDBDB, rounded: 0}
-			}
-		});
-		this._game = game;
-		
-		this.placeholder = placeholder;
-		this.text = default_text;
 	}
 }
 
@@ -648,7 +1027,7 @@ class Game_Board extends PIXI.Container {
 	}
 	addBoardGraphics() {
 		this._BoardGraphics = new PIXI.Graphics();
-		this._BoardGraphics.lineStyle(this._BoxSize/2, 0x333333);
+		this._BoardGraphics.lineStyle(this._BoxSize/2, 0x222222);
 		this._BoardGraphics.beginFill(BOARD);
 		this._BoardGraphics.drawRect(-this._BoxSize/4, -this._BoxSize/4, 15*this._BoxSize + this._BoxSize/2, 15*this._BoxSize + this._BoxSize/2);
 		this._BoardGraphics.endFill();
@@ -995,16 +1374,17 @@ class Game_Board extends PIXI.Container {
 		this._Dice.x = (this.width / 2) - this._BoxSize/2;
 		this._Dice.y = (this.height / 2) - this._BoxSize/2;
 		this._Dice.rotation = 0;
-		this._Dice.interactive = false;
+		this._Dice.setInteractive(false);
 		this._Dice.changeColor(0xffffff);
 		this._Dice.texture = this._Dice.textures[0];
 		Object.values(this._game.Players).forEach(function(player) {
 			player.clearInfo();
+			player.clearTimer();
 			Object.values(player.Pieces).forEach(function(piece) {
 				piece.send_home();
 				piece.mark_as_ineligible();
-			})
-		})
+			});
+		});
 	}
 }
 class Game_Board_Home extends PIXI.Graphics {
@@ -1063,6 +1443,7 @@ class Game_Board_Home extends PIXI.Graphics {
 			this.drawCircle(room.x, room.y, 0.55*this._board._BoxSize);
 		}, this);
 		this.endFill();
+		this.cacheAsBitmap = false;
 	}
 }
 class Game_Board_Dice extends PIXI.AnimatedSprite {
@@ -1262,8 +1643,28 @@ class Game_Board_Dice extends PIXI.AnimatedSprite {
 			b: color & 255,
 		}
 	}
+
+	setInteractive(bool) {
+		let t;
+		if (this._board._game._isLocal && this._board._game._localBots.includes(this._board._game.my_seq_id)) {
+			this.interactive = false;
+			t = 500;
+		} else {
+			this.interactive = bool;
+			t = 5*1000;
+		}
+		if (bool === true) {
+			this._board._game.Players[this._board._game.my_seq_id].setTimer(t, function() {
+				this._rotationdirection =  Math.random() < 0.5 ? -1 : 1;
+				this._power = Math.floor((Math.random() * 4) + 1);
+				this._acceleration = {x: (Math.random() < 0.5 ? -1 : 1)*(Math.floor((Math.random() * 100) + 1)), y: (Math.random() < 0.5 ? -1 : 1)*(Math.floor((Math.random() * 100) + 1))};
+				this._roll();
+			}.bind(this));
+		}
+	}
+
 	roll(x, my_turn) {
-		this.interactive = false;
+		this.setInteractive(false);
 		this._value = x;
 		this._board._game.setBusy();
 
@@ -1340,9 +1741,13 @@ class Game_Board_Dice extends PIXI.AnimatedSprite {
 			this._power = 0;
 			this._acceleration = {x: 0, y: 0};
 			if (my_turn === true)
-				this._board._game.Players[this._board._game.player_turn].checkMyPieces();
+				this._board._game.Players[this._board._game.my_seq_id].checkMyPieces();
 			this._board._game.setReady();
 		}, 1.1*1000);
+	}
+	_roll() {
+		this._board._game.Players[this._board._game.my_seq_id].clearTimer();
+		this.roll(Math.floor(this._board._game.token() * 6) + 1, true);
 	}
 
 	start_emitter() {
@@ -1361,7 +1766,7 @@ class Game_Board_Dice extends PIXI.AnimatedSprite {
 			this.alpha = 1;
 			this.dragging = false;
 			this.data = null;
-			this.roll(Math.floor(this._board._game.token() * 6) + 1, true);
+			this._roll();
 		}
 	}
 	onDragMove() {
@@ -1397,6 +1802,8 @@ class Game_Player {
 			4: new Game_Player_Piece(this, 4)
 		}
 	
+		this.Timer = null;
+
 		switch(seq_id) {
 			case 1:
 				this._text = new PIXI.Text('', {fontFamily: 'Lato', fontSize: 0.35*this._game._board._BoxSize, fill: BORDER, align: 'center'});
@@ -1436,7 +1843,7 @@ class Game_Player {
 		this._text.text = text;
 		if (this.percentage === 100) {
 			this._game._chat.addMessage(this.name+" WON", 0);
-			PIXI.Loader.shared.resources.winner.sound.play();
+			PIXI.Loader.shared.resources.winning.sound.play();
 		}
 	}
 	clearInfo() {
@@ -1447,17 +1854,48 @@ class Game_Player {
 		}
 	}
 	checkMyPieces() {
+		let pieces_that_can_move = [];
 		let pieces_that_can_move_positions = [];
-		let a_piece_that_can_move = null;
+		let preferred_pieces_that_can_move = {1: null, 2: null, 3: null, 4: null};
+		let extra_offset = this._game._board._Dice._value;
+
 		Object.values(this.Pieces).forEach(function(piece) {
 			let p_c = piece.check();
-			if (p_c && (piece._pos === 0 || !pieces_that_can_move_positions.includes(piece._pos))) {
+			if (p_c && !pieces_that_can_move_positions.includes(piece._pos)) {
+				if (piece._pos === 0) {
+					preferred_pieces_that_can_move[2] = piece;
+				} else {
+					let [c_friends, c_enemies] = piece.checkCollision(false, true, extra_offset);
+					if (c_enemies.length)
+						preferred_pieces_that_can_move[1] = piece;
+					else if (SAFE_PATH.includes(piece._pos + extra_offset))
+						preferred_pieces_that_can_move[3] = piece;
+					else if (!piece.isSafe())
+						preferred_pieces_that_can_move[4] = piece;
+				}
+				pieces_that_can_move.push(piece);
 				pieces_that_can_move_positions.push(piece._pos);
-				a_piece_that_can_move = piece;
 			}
 		});
-		if (pieces_that_can_move_positions.length === 1)
-			a_piece_that_can_move.move();
+
+		if (pieces_that_can_move.length === 1) {
+			pieces_that_can_move[0].move();
+		} else if (pieces_that_can_move.length > 1) {
+			let t;
+			if (this._game._isLocal && this._game._localBots.includes(this._seq_id))
+				t = 700;
+			else
+				t = 15*1000;
+			let piece_to_move = preferred_pieces_that_can_move[1] || preferred_pieces_that_can_move[2] || preferred_pieces_that_can_move[3] || preferred_pieces_that_can_move[4] || pieces_that_can_move[Math.floor(Math.random() * pieces_that_can_move.length)];
+			this.setTimer(t, function() {
+				piece_to_move.move();
+			});
+		} else if (this._game._board._Dice._value === 6) {
+			this._game._board._Dice.setInteractive(true);
+		} else if (this._game._isLocal) {
+			this._game.NextPlayerTurn();
+			this._game.onServerUpdate({players_data: {}, playing: true, player_turn: this._game.player_turn});
+		}
 	}
 	markMyPieces_as_ineligible() {
 		Object.values(this.Pieces).forEach(function(piece) {
@@ -1476,7 +1914,14 @@ class Game_Player {
 				}, this);
 			}
 		}
-		this._game._board.updateTransform();
+		if (this._game._board.parent)
+			this._game._board.updateTransform();
+	}
+	setTimer(duration, action) {
+		this.Timer = setTimeout(action, duration);
+	}
+	clearTimer() {
+		clearTimeout(this.Timer);
 	}
 }
 class Game_Player_Piece extends PIXI.Sprite {
@@ -1524,7 +1969,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 
 		this.buttonMode = true;
 		this.interactive = false;
-		this.position.copyFrom(this._room);
+		this.send_home();
 		this.on('pointerdown', function() {
 			if (this._pos === 1 || this._pos === 53) {
 				var [c_friends, c_enemies] = this.checkCollision(true, false);
@@ -1571,6 +2016,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 	}
 
 	isSafe() {
+		return SAFE_PATH.includes(this._pos);
 	}
 	canMove() {
 		let steps = this._player._game._board._Dice._value;
@@ -1582,12 +2028,18 @@ class Game_Player_Piece extends PIXI.Sprite {
 
 	send_home() {
 		this._pos = 0;
-		this.position.copyFrom(this._room);
+		this.timeline.to(this, 0.05, this._path[0], '>');
+	}
+	make_first_step() {
+		if (this._pos != 1)
+			this._pos = 1;
+		this.timeline.to(this, 0.05, this._path[1], '>');
 	}
 
 	check() {
 		if (this.canMove()) {
-			this.mark_as_eligible();
+			if (!(this._player._game._isLocal && this._player._game._localBots.includes(this._player._game.my_seq_id)))
+				this.mark_as_eligible();
 			return true;
 		}
 		return false;
@@ -1604,6 +2056,8 @@ class Game_Player_Piece extends PIXI.Sprite {
 	}
 
 	move() {
+		this._player.clearTimer();
+
 		let dice = this._player._game._board._Dice;
 		let steps = dice._value;
 		let old_pos = this._pos;
@@ -1627,11 +2081,11 @@ class Game_Player_Piece extends PIXI.Sprite {
 		});
 
 		if (this._pos === 1) {
-			this.position.copyFrom(this._path[this._pos]);
+			this.make_first_step();
 			PIXI.Loader.shared.resources.first_step.sound.play();
 			this._player.updatePercentage();
 
-			dice.interactive = true;
+			dice.setInteractive(true);
 		} else {
 			for (var i = 1; i <= steps; i++) {
 				setTimeout(() => {
@@ -1646,16 +2100,23 @@ class Game_Player_Piece extends PIXI.Sprite {
 				} else if (c_enemies.length) {
 					c_enemies.forEach(function(piece) {
 						piece.send_home();
+						piece.mark_as_ineligible();
+						piece._player.updatePercentage();
 						PIXI.Loader.shared.resources.eat.sound.play();
 					});
 				}
 
 				this._player.updatePercentage();
 
-				if ((steps === 6 || c_enemies.length) && this._player.percentage != 100)
-					dice.interactive = true;
-				else
+				if ((steps === 6 || c_enemies.length) && this._player.percentage != 100) {
+					dice.setInteractive(true);
+				} else {
+					if (this._player._game._isLocal) {
+						this._player._game.NextPlayerTurn();
+						this._player._game.onServerUpdate({players_data: {}, playing: true, player_turn: this._player._game.player_turn});
+					}
 					this._player._game.setReady();
+				}
 			}, 0.07*steps*1000);
 		}
 	}
@@ -1667,8 +2128,10 @@ class Game_Player_Piece extends PIXI.Sprite {
 
 		var [c_friends, c_enemies] = this.checkCollision(false, true);
 
+		this._player.markMyPieces_as_ineligible();
+
 		if (this._pos === 1) {
-			this.position.copyFrom(this._path[this._pos]);
+			this.make_first_step();
 			PIXI.Loader.shared.resources.first_step.sound.play();
 			this._player.updatePercentage();
 
@@ -1688,6 +2151,8 @@ class Game_Player_Piece extends PIXI.Sprite {
 				} else if (c_enemies.length) {
 					c_enemies.forEach(function(piece) {
 						piece.send_home();
+						piece.mark_as_ineligible();
+						piece._player.updatePercentage();
 						PIXI.Loader.shared.resources.eat.sound.play();
 					});
 				}
@@ -1699,9 +2164,10 @@ class Game_Player_Piece extends PIXI.Sprite {
 		}
 	}
 
-	checkCollision(friends, enemies) {
+	checkCollision(friends, enemies, extra_offset) {
 		let c_friends = [];
 		let c_enemies = [];
+		extra_offset = extra_offset || 0;
 		
 		for (let [player_seq_id, player] of Object.entries(this._player._game.Players)) {
 			if (parseInt(player_seq_id) === this._player._seq_id) {
@@ -1718,7 +2184,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 				if (enemies) {
 					// check for c_enemies
 					Object.values(player.Pieces).forEach(function(piece) {
-						if (!SAFE_PATH.includes(piece._pos)) {
+						if (!piece.isSafe()) {
 							let offset = parseInt(player_seq_id) - this._player._seq_id;
 							if (offset > 0) {
 								if (piece._pos <= (4-offset)*13)
@@ -1731,8 +2197,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 								else
 									offset = -offset*13;
 							}
-							if (piece._pos - offset === this._pos) {
-								console.log(piece);
+							if (piece._pos - offset === this._pos + extra_offset) {
 								c_enemies.push(piece);
 							}
 						}

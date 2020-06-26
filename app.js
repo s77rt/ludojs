@@ -1,4 +1,5 @@
 // app.js
+const config = require('./config.js');
 const path = require('path');
 const express = require('express');
 const app = express();
@@ -9,12 +10,15 @@ const io = require('socket.io').listen(server);
 app.get('/', function(req, res) {
 	res.sendFile(path.join(__dirname + '/index.html'));
 });
+app.get('/service-worker.js', function(req, res) {
+	res.sendFile(path.join(__dirname + '/service-worker.js'));
+});
 
 // Static Routing
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // Start the Express server
-server.listen(4004, () => console.log('Server running on port 4004'));
+server.listen(config.Port, () => console.log('Server running on port '+config.Port));
 
 // Game Server (Sockets)
 require('./game.server.js')(io);

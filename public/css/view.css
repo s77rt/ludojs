@@ -6,6 +6,11 @@ body {
 	height: 100%;
 	font-family: 'Lato', sans-serif;
 }
+html {
+	background: #EDE574;  /* fallback for old browsers */
+	background: -webkit-linear-gradient(to top, #E1F5C4, #EDE574);  /* Chrome 10-25, Safari 5.1-6 */
+	background: linear-gradient(to top, #E1F5C4, #EDE574); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+}
 body {
 	display: flex;
 	align-items: center;
@@ -17,7 +22,7 @@ body {
 	top: 0;
 	z-index: 1000;
 	font-size: 26px;
-	color: #ffffff;
+	color: #111111;
 	user-select: none;
 }
 p {
@@ -67,3 +72,82 @@ input[type=number] {
 	  transform: rotate(360deg);
 	}
 }
+
+.d-flex {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.playerconfig {
+	position: relative;
+	width: 50%;
+	display: inline-block;
+ }
+
+.playerconfig:before {
+	content: "";
+	display: block;
+	padding-top: 100%;
+}
+
+.playerconfig-content {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	color: #000000;
+	height: 100%;
+	width: 100%;
+	text-align: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	font-size: 1.25em;
+	user-select: none;
+	overflow: hidden;
+	overflow-wrap: normal;
+	margin: 0;
+	padding: 0;
+	outline: none;
+	border: none;
+}
+
+
+
+.slidecontainer {
+  width: 100%; /* Width of the outside container */
+}
+
+
+.slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 15px;
+  border-radius: 5px;  
+  background: #aaaaaa !important;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%; 
+  background: #d33 !important;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #d33 !important;
+  cursor: pointer;
+}
+

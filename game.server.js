@@ -1,32 +1,22 @@
-exports = module.exports = function(io){
-	console.log("Game server started");
-	io.on('connection', function (socket) {
-		let player = _Players.AddPlayer(socket);
-
-		socket.on('disconnect', function () {
-			_Players.DeletePlayer(socket.id);
-		});
-
-		socket.on('OnlinePlayers', function () {
-			socket.emit('OnlinePlayers', Object.keys(_Players.PlayersList).length);
-		});
-
-		socket.on('AutoServer', player.AutoServer.bind(player));
-		socket.on('HostServer', player.HostServer.bind(player));
-		socket.on('JoinServer', player.JoinServer.bind(player));
-		socket.on('LeaveServer', player.LeaveServer.bind(player));
-		socket.on('StartGame', player.StartGame.bind(player));
-		socket.on('UpdateGame', player.UpdateGame.bind(player));
-		socket.on('Message', player.Message.bind(player));
-	});
-};
+/*
+	Modules that we need
+*/
 
 var seedrandom = require('seedrandom');
+var SpawnBot = require('./game.server.bot.js');
+
+/*
+	Initialize
+*/
 
 var _Servers = new Servers();
 var _Players = new Players();
 
 const SAFE_PATH = [0, 1, 14, 27, 40, 53, 54, 55, 56, 57, 58, 59];
+
+/*
+	Logic
+*/
 
 // Servers
 function Server(id, isPrivate) {
@@ -35,6 +25,7 @@ function Server(id, isPrivate) {
 	this.token = this.randomToken();
 	this._token_validate = seedrandom(this.token);
 	this._dice_value = null;
+	this._expected_action = "roll";
 	this.players = 1;
 	this.max_players = 4;
 	this.playing = false;
@@ -122,22 +113,31 @@ Server.prototype.StartGame = function() {
 	this.playing = true;
 }
 Server.prototype.NextPlayerTurn = function() {
-	let next_player = -1;
+	let players_that_are_still_playing = 0;
+	let next_player = null;
+	let next_player_id = null;
 	var tmp_next_player = this.player_turn;
 	var checks = 0;
 	while(checks < 4) {
 		tmp_next_player = tmp_next_player === 4 ? 1 : tmp_next_player+1;
 		if (this.players_data[tmp_next_player].id && this.players_data[tmp_next_player].percentage != 100) {
-			next_player = tmp_next_player;
-			break;
+			if (!next_player) {
+				next_player = tmp_next_player;
+				next_player_id = this.players_data[next_player].id;
+			}
+			players_that_are_still_playing++;
 		}
 		checks++;
 	}
-	if (next_player != -1) {
+	if (next_player_id && players_that_are_still_playing > 1) {
 		this.token = this.randomToken();
 		this._token_validate = seedrandom(this.token);
+		this._expected_action = "roll";
+		this.player_turn = next_player;
+		_Players.PlayersList[next_player_id].setTimer();
+	} else {
+		this.player_turn = -1;
 	}
-	this.player_turn = next_player;
 }
 Server.prototype.updatePlayerPercentage = function(player) {
 	var totalPos = 0;
@@ -173,6 +173,22 @@ function Player(socket) {
 	this.socket = socket;
 	this.server = null;
 	this.seq_id = null;
+	this.Timer = null;
+}
+Player.prototype.setTimer = function() {
+	this.Timer = setTimeout(() => {
+		if (this.server) {
+			this.LeaveServer();
+			this.socket.emit('ServerError', 'You have been kicked out due to inactivity');
+		}
+	}, 30*1000);
+}
+Player.prototype.clearTimer = function() {
+	clearTimeout(this.Timer);
+}
+Player.prototype.resetTimer = function() {
+	this.clearTimer();
+	this.setTimer();
 }
 Player.prototype.AutoServer = function(playername) {
 	let server_id = _Servers.GetAutoServer();
@@ -182,11 +198,16 @@ Player.prototype.AutoServer = function(playername) {
 		this.JoinServer(server_id, playername);
 	}
 }
-Player.prototype.JoinServer = function(server_id, playername) {
+Player.prototype.JoinServer = function(server_id, playername, or_host) {
+	this.LeaveServer();
 	server_id = parseInt(server_id);
 	let server = _Servers.ServersList[server_id];
 	if (!server) {
-		this.socket.emit('ServerError', 'Table #'+server_id+' does not exist');
+		if (or_host === true) {
+			this.HostServer(true, playername, server_id);
+		} else {
+			this.socket.emit('ServerError', 'Table #'+server_id+' does not exist');
+		}
 		return;
 	}
 	let seq_id = server.GetSeqIdForNewPlayerInServer();
@@ -195,7 +216,7 @@ Player.prototype.JoinServer = function(server_id, playername) {
 		this.socket.join(server_id);
 		this.server = server;
 		this.seq_id = seq_id;
-		this.server.players_data[seq_id].name = playername.replace(/[^\w]/gi, '').trim().substring(0, 15) || "Ghost";
+		this.server.players_data[seq_id].name = (playername || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || "Ghost";
 
 		server.players++;
 		server.players_data[this.seq_id].id = this.socket.id;
@@ -205,15 +226,16 @@ Player.prototype.JoinServer = function(server_id, playername) {
 			server.StartGame();
 		this.socket.emit('ServerUpdate', server);
 		this.socket.to(server_id).emit('ServerUpdate', server);
-		console.log("SUCCESS: Player joined to a server");
 	} else {
 		this.socket.emit('ServerError', 'Table #'+server_id+' is not available');
-		console.log("FAIL: Player joined to a server");
 	}
 }
-Player.prototype.HostServer = function(isPrivate, playername) {
+Player.prototype.HostServer = function(isPrivate, playername, server_id) {
+	this.LeaveServer();
 	isPrivate = (isPrivate === true) ? true : false;
-	var server_id = random_number();
+	server_id = parseInt(server_id);
+	if (!(server_id < Number.MAX_SAFE_INTEGER && server_id > 999999)) // 6 digits servers id are reserved for HostServer() that does not specify a server_id
+		server_id = random_number();
 	while(_Servers.ServersList.hasOwnProperty(server_id)) {
 		server_id = random_number();
 	}
@@ -222,13 +244,15 @@ Player.prototype.HostServer = function(isPrivate, playername) {
 	this.socket.join(server_id);
 	this.server = server;
 	this.seq_id = Math.floor(Math.random() * 4) + 1;
-	this.server.players_data[this.seq_id].name = playername.replace(/[^\w]/gi, '').trim().substring(0, 15) || "Ghost";
+	this.server.players_data[this.seq_id].name = (playername || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || "Ghost";
 
 	server.players_data[this.seq_id].id = this.socket.id;
 
+	if (!isPrivate)
+		SpawnBot(server_id);
+
 	this.socket.emit('HostServer', {seq_id: this.seq_id, isPrivate: isPrivate, server_id: server_id});
 	this.socket.emit('ServerUpdate', server);
-	console.log("SUCCESS: Player is hosting a server", server.id);
 }
 Player.prototype.LeaveServer = function() {
 	if (!this.server)
@@ -242,13 +266,15 @@ Player.prototype.LeaveServer = function() {
 	server.players--;
 
 	this.server = null;
+	this.clearTimer();
 
 	if (server.players === 0) {
 		this.socket.leave(server_id);
 		_Servers.DeleteServer(server_id);
 	} else {
-		if (server.player_turn === this.seq_id)
+		if (server.player_turn === this.seq_id) {
 			server.NextPlayerTurn();
+		}
 		this.socket.to(server_id).emit('ServerUpdate', server);
 		this.socket.leave(server_id);
 	}
@@ -256,7 +282,6 @@ Player.prototype.LeaveServer = function() {
 	this.seq_id = null;
 
 	this.socket.emit('LeaveServer', true);
-	console.log("SUCCESS: Player left a server");
 }
 Player.prototype.StartGame = function() {
 	if (!this.server)
@@ -264,9 +289,13 @@ Player.prototype.StartGame = function() {
 	if (this.server.playing)
 		return;
 
-	this.server.StartGame();
-	this.socket.emit('ServerUpdate', this.server);
-	this.socket.to(this.server.id).emit('ServerUpdate', this.server);
+	if (this.server.players === 1) {
+		this.socket.emit('GameError', "At least two players are required to start the game");
+	} else {
+		this.server.StartGame();
+		this.socket.emit('ServerUpdate', this.server);
+		this.socket.to(this.server.id).emit('ServerUpdate', this.server);
+	}
 }
 Player.prototype.UpdateGame = function(action) {
 	if (!this.server)
@@ -274,7 +303,7 @@ Player.prototype.UpdateGame = function(action) {
 	if (!this.server.playing)
 		return;
 
-	if (this.server.player_turn === this.seq_id) {
+	if (this.server.player_turn === this.seq_id && this.server._expected_action === action.action) {
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
@@ -287,7 +316,15 @@ Player.prototype.UpdateGame = function(action) {
 				var CanPlay = Object.values(this.server.players_data[this.seq_id].pieces).some((piece) => 
 					((piece === 0 && data.number === 6) || (piece >= 1 && piece + data.number <= 59))
 				);
-				if (!CanPlay) {
+				if (CanPlay) {
+					this.resetTimer();
+					this.server._expected_action = "move";
+				} else if (data.number === 6) {
+					this.resetTimer();
+					this.server._expected_action = "roll";
+				} else {
+					this.clearTimer();
+					this.server._expected_action = "roll";
 					this.server.NextPlayerTurn();
 					this.socket.emit('ServerUpdate', this.server);
 					this.socket.to(this.server.id).emit('ServerUpdate', this.server);
@@ -299,9 +336,9 @@ Player.prototype.UpdateGame = function(action) {
 					return;
 				if (data.old_pos != this.server.players_data[data.player].pieces[data.piece])
 					return;
-				if (data.new_pos === 1) {
-					if (this.server._dice_value != 6)
-						return;
+				if (data.old_pos === 0) {
+					if (data.new_pos != 1 || this.server._dice_value != 6)
+						return
 				} else if (data.new_pos <= 59){
 					if (data.new_pos - data.old_pos != this.server._dice_value)
 						return;
@@ -314,17 +351,11 @@ Player.prototype.UpdateGame = function(action) {
 
 				let c_enemies = 0;
 				for (let [player_seq_id, player] of Object.entries(this.server.players_data)) {
-					if (parseInt(player_seq_id) === this.seq_id) {
-						// check for c_friends
-						/*for (let [piece_seq_id, piece] of Object.entries(player.pieces)) {
-							if (parseInt(piece_seq_id) != data.piece && piece === data.new_pos)
-								bla bla..., not needed for now;
-						}*/
-					} else {
+					if (parseInt(player_seq_id) != this.seq_id) {
 						// check for c_enemies
 						for (let [piece_seq_id, piece] of Object.entries(player.pieces)) {
 							if (!SAFE_PATH.includes(piece)) {
-								let offset = parseInt(player_seq_id) - data.player;
+								let offset = parseInt(player_seq_id) - this.seq_id;
 								if (offset > 0) {
 									if (piece <= (4-offset)*13)
 										offset = -offset*13;
@@ -346,12 +377,15 @@ Player.prototype.UpdateGame = function(action) {
 					}
 				}
 
-				console.log(this.server.players_data);
 				this.socket.to(this.server.id).emit('GameUpdate', action);
+				this.server._expected_action = "roll";
 				if ((this.server._dice_value != 6 && c_enemies === 0) || this.server.players_data[this.seq_id].percentage === 100) {
+					this.clearTimer();
 					this.server.NextPlayerTurn();
 					this.socket.emit('ServerUpdate', this.server);
 					this.socket.to(this.server.id).emit('ServerUpdate', this.server);
+				} else {
+					this.resetTimer();
 				}
 				break;
 		}
@@ -362,7 +396,7 @@ Player.prototype.Message = function(msg) {
 		return;
 	if (!this.server._isPrivate)
 		return;
-	msg = msg.replace(/[^\w\s]/gi, '').trim().substring(0, 128);
+	msg = (msg || '').replace(/[^\w\s]/gi, '').trim().substring(0, 128);
 	if (msg.length) {
 		this.socket.to(this.server.id).emit('Message', {msg: msg, source: this.seq_id});
 	}
@@ -380,6 +414,37 @@ Players.prototype.DeletePlayer = function(id) {
 	delete this.PlayersList[id];
 }
 
+/*
+	Helpers
+*/
+
 function random_number() {
 	return 100000 + Math.floor(Math.random() * 900000);
 }
+
+/*
+	Show Time :)
+*/
+
+exports = module.exports = function(io) {
+	console.log("Game server started");
+	io.on('connection', function (socket) {
+		let player = _Players.AddPlayer(socket);
+
+		socket.on('disconnect', function () {
+			_Players.DeletePlayer(socket.id);
+		});
+
+		socket.on('OnlinePlayers', function () {
+			socket.emit('OnlinePlayers', Object.keys(_Players.PlayersList).length);
+		});
+
+		socket.on('AutoServer', player.AutoServer.bind(player));
+		socket.on('HostServer', player.HostServer.bind(player));
+		socket.on('JoinServer', player.JoinServer.bind(player));
+		socket.on('LeaveServer', player.LeaveServer.bind(player));
+		socket.on('StartGame', player.StartGame.bind(player));
+		socket.on('UpdateGame', player.UpdateGame.bind(player));
+		socket.on('Message', player.Message.bind(player));
+	});
+};
