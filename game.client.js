@@ -940,7 +940,7 @@ class Game_MainMenu extends PIXI.Container {
 
 		this._numberOfButtons = 0;
 
-		this.addButton("🌐 Play Public", this._game.AutoServer.bind(this._game));
+		this.addButton("🌐 Play Online", this._game.AutoServer.bind(this._game));
 		this.addButton("👑 Host Private", function() {
 			this.HostServer(true);
 		}.bind(this._game));
