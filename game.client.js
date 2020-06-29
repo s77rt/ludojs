@@ -730,9 +730,9 @@ class Game_Chat {
 					}
 				} else {
 					if (msg.startsWith('You ')) {
-						msg = msg.replace('You ', '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">You </span>');
+						msg = msg.replace('You ', '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">You </span>');
 					} else if (msg.startsWith('Your ')) {
-						msg = msg.replace('Your ', '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">Your </span>');
+						msg = msg.replace('Your ', '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">Your </span>');
 					} else if (msg.endsWith(current_player)) {
 						msg = msg.replace(current_player, '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">'+current_player+'</span>');
 					}
