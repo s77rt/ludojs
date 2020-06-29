@@ -722,20 +722,20 @@ class Game_Chat {
 		let color = COLOR_MAP[source].toString(16).padStart(6, '0');
 		if (source === 0)  {
 			person = "System";
+
+			if (msg.startsWith('You '))
+				msg = msg.replace('You ', '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">You </span>');
+			else if (msg.startsWith('Your '))
+				msg = msg.replace('Your ', '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">Your </span>');
+
 			if (this._game.player_turn > 0) {
 				let current_player = this._game.Players[this._game.player_turn].name;
 				if (this._game._isLocal) {
-					if (msg.startsWith(current_player+' ')) {
+					if (msg.startsWith(current_player+' '))
 						msg = msg.replace(current_player+' ', '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">'+current_player+' </span>');
-					}
 				} else {
-					if (msg.startsWith('You ')) {
-						msg = msg.replace('You ', '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">You </span>');
-					} else if (msg.startsWith('Your ')) {
-						msg = msg.replace('Your ', '<span style="color: #'+COLOR_MAP[this._game.my_seq_id].toString(16).padStart(6, '0')+'">Your </span>');
-					} else if (msg.endsWith(current_player)) {
+					if (msg.endsWith(current_player))
 						msg = msg.replace(current_player, '<span style="color: #'+COLOR_MAP[this._game.player_turn].toString(16).padStart(6, '0')+'">'+current_player+'</span>');
-					}
 				}
 			}
 		} else {
