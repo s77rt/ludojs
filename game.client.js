@@ -121,21 +121,23 @@ class Game {
 							button.addEventListener("click", function(){
 								let player_seq_id = button.dataset.player;
 								let player_data = localStorage.getObject('player'+player_seq_id);
+								let tmp_player_data_name;
 								let player_data_name;
 								if (player_data) {
-									player_data_name = (player_data.name || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+player_seq_id;
+									tmp_player_data_name = (player_data.name || '').replace(/[^\w]/gi, '').trim().substring(0, 15);
 								} else {
-									player_data_name = 'Player'+player_seq_id;
+									tmp_player_data_name = 'Player'+player_seq_id;
 								}
+								player_data_name = tmp_player_data_name || 'Player'+player_seq_id;
 								const player = content.querySelector('input[data-player="'+player_seq_id+'"]');
 								switch(button.dataset.status) {
 									case "{none}":
 										localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: false});
 										button.dataset.status = "{player}";
-										button.innerText = player_data_name;
+										button.innerText = tmp_player_data_name;
 										button.style.opacity = 1;
 										player.disabled = false;
-										player.value = player_data_name;
+										player.value = tmp_player_data_name;
 										break;
 									case "{player}":
 										localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: true});
@@ -163,9 +165,9 @@ class Game {
 							let player_data_name;
 							player.addEventListener("input", function() {
 								player_data_name = player.value.replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+player_seq_id;
-								player.value = player_data_name;
+								player.value = tmp_player_data_name;
 								const button = content.querySelector('button[data-player="'+player_seq_id+'"]');
-								button.innerText = player_data_name;
+								button.innerText = tmp_player_data_name;
 								localStorage.setObject('player'+player_seq_id, {name: player_data_name, isbot: false});
 							});
 						});
@@ -614,8 +616,9 @@ class Game {
 					const playername = content.querySelector('#playername');
 					playername.value = (localStorage.getItem('playername') || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
 					playername.addEventListener("input", function(){
-						let name = playername.value.replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
-						playername.value = name;
+						let tmp_name = playername.value.replace(/[^\w]/gi, '').trim().substring(0, 15);
+						let name = tmp_name || 'Player'+random_number();
+						playername.value = tmp_name;
 						localStorage.setItem('playername', name);
 						this.playername = name;
 					}.bind(this));
