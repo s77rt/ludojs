@@ -162,9 +162,11 @@ class Game {
 						const players = content.querySelectorAll('.player');
 						players.forEach(function(player) {
 							let player_seq_id = player.dataset.player;
+							let tmp_player_data_name;
 							let player_data_name;
 							player.addEventListener("input", function() {
-								player_data_name = player.value.replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+player_seq_id;
+								tmp_player_data_name = player.value.replace(/[^\w]/gi, '').trim().substring(0, 15);
+								player_data_name = tmp_player_data_name || 'Player'+player_seq_id;
 								player.value = tmp_player_data_name;
 								const button = content.querySelector('button[data-player="'+player_seq_id+'"]');
 								button.innerText = tmp_player_data_name;
