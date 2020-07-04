@@ -725,7 +725,7 @@ class Game_Chat {
 	}
 	addMessage(msg, source) {
 		var person;
-		msg = msg.replace(/[^\w\s]/gi, '').trim().substring(0, 128);
+		msg = filterXSS(msg || '').trim().substring(0, 128);
 		let color = COLOR_MAP[source].toString(16).padStart(6, '0');
 		if (source === 0)  {
 			person = "System";
@@ -890,8 +890,7 @@ class Game_Control extends PIXI.Container {
 					}
 				  }
 				});
-				msg = msg || '';
-				msg = msg.replace(/[^\w\s]/gi, '').trim().substring(0, 128);
+				msg = filterXSS(msg || '').trim().substring(0, 128);
 				if (msg.length) {
 					if (!this._isLocal)
 						this.Message(msg);

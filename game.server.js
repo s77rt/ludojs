@@ -4,6 +4,7 @@
 
 var seedrandom = require('seedrandom');
 var SpawnBot = require('./game.server.bot.js');
+var filterXSS = require("xss");
 
 /*
 	Initialize
@@ -396,7 +397,7 @@ Player.prototype.Message = function(msg) {
 		return;
 	if (!this.server._isPrivate)
 		return;
-	msg = (msg || '').replace(/[^\w\s]/gi, '').trim().substring(0, 128);
+	msg = filterXSS(msg || '').trim().substring(0, 128);
 	if (msg.length) {
 		this.socket.to(this.server.id).emit('Message', {msg: msg, source: this.seq_id});
 	}
