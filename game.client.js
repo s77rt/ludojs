@@ -666,6 +666,7 @@ class Game {
 		this.brand.style.display = "block";
 	}
 	loadBoard(isPrivate, isLocal) {
+		PIXI.sound.stopAll();
 		this.brand.style.display = "none";
 		this._app.stage.removeChildren();
 		this._isPrivate = isPrivate;
