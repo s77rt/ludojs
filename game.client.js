@@ -1377,6 +1377,7 @@ class Game_Board extends PIXI.Container {
 		this._Path_BLUE[58] = {x: round((7*this._BoxSize)+(this._BoxSize/2)), y: round((8*this._BoxSize)+(this._BoxSize/2))};
 	}
 	reset() {
+		this._Dice.value = null;
 		this._Dice.x = (this.width / 2) - this._BoxSize/2;
 		this._Dice.y = (this.height / 2) - this._BoxSize/2;
 		this._Dice.rotation = 0;
