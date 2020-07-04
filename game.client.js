@@ -654,6 +654,7 @@ class Game {
 		this.loadMainMenu();
 	}
 	loadMainMenu() {
+		PIXI.sound.stopAll();
 		this._chat.hide();
 		this._chat.reset();
 		this._banner.hide();
@@ -666,7 +667,6 @@ class Game {
 		this.brand.style.display = "block";
 	}
 	loadBoard(isPrivate, isLocal) {
-		PIXI.sound.stopAll();
 		this.brand.style.display = "none";
 		this._app.stage.removeChildren();
 		this._isPrivate = isPrivate;
