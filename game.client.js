@@ -38,6 +38,7 @@ Storage.prototype.getObject = function(key) {
 class Game {
 	constructor() {
 		this.playername = (localStorage.getItem('playername') || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
+		this.preferred_seq_id = parseInt(localStorage.getItem('preferred_seq_id') || 0);
 		this.my_seq_id = 1; // 1 is for just for fallback
 		this.player_turn = null;
 		this.busy = false; // for smooth updaes
@@ -257,20 +258,20 @@ class Game {
 		this.spinner.show();
 		this.player_turn = null;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
-		this._socket.emit('AutoServer', this.playername);
+		this._socket.emit('AutoServer', this.playername, this.preferred_seq_id);
 	}
 	JoinServer(id, or_host) {
 		this.spinner.show();
 		this.player_turn = null;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
-		this._socket.emit('JoinServer', id, this.playername, or_host);
+		this._socket.emit('JoinServer', id, this.playername, this.preferred_seq_id, or_host);
 	}
 	HostServer(isPrivate) {
 		this.spinner.show();
 		this.player_turn = null;
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
 		isPrivate = (isPrivate === true) ? true : false;
-		this._socket.emit('HostServer', isPrivate, this.playername);
+		this._socket.emit('HostServer', isPrivate, this.playername, this.preferred_seq_id);
 	}
 	LeaveServer() {
 		this.my_seq_id = 1;
@@ -602,30 +603,64 @@ class Game {
 				'Volume ( <span id="volume">100</span>% )<br>'+
 				'<div class="slidecontainer"><input id="swal-volume-settings" class="swal2-range slider" min="0" max="1" step="0.01" value="1" type="range"></div>'+
 				'<br>Player Name<br>'+
-				'<input id="playername" type="text" class="swal2-input" placeholder="Your name...">',
-			onBeforeOpen: () => {
-				const content = Swal.getContent();
-				if (content) {
-					const volume = content.querySelector('#volume');
-					volume.innerText = Math.floor(PIXI.sound.volumeAll*100);
-					const volume_controller = content.querySelector('#swal-volume-settings');
-					volume_controller.value = PIXI.sound.volumeAll;
-					volume_controller.addEventListener("input", function() {
-						PIXI.sound.volumeAll = volume_controller.value;
+				'<input id="playername" type="text" class="swal2-input" placeholder="Your name...">'+
+				'<br>Preferred Color<br><br>'+
+				'<div class="d-flex">'+
+				'<div class="playerconfig w20"><button data-playerseqid="0" class="preferredcolor playerconfig-content" style="opacity: 0.5;background-color: #ffffff">None</button></div>'+
+				'<div class="playerconfig w20"><button data-playerseqid="1" class="preferredcolor playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[1].toString(16).padStart(6, '0')+'">RED</button></div>'+
+				'<div class="playerconfig w20"><button data-playerseqid="2" class="preferredcolor playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[2].toString(16).padStart(6, '0')+'">GREEN</button></div>'+
+				'<div class="playerconfig w20"><button data-playerseqid="3" class="preferredcolor playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[3].toString(16).padStart(6, '0')+'">YELLOW</button></div>'+
+				'<div class="playerconfig w20"><button data-playerseqid="4" class="preferredcolor playerconfig-content" style="opacity: 0.5;background-color: #'+COLOR_MAP[4].toString(16).padStart(6, '0')+'">BLUE</button></div>'+
+				'</div>',
+			  onBeforeOpen: () => {
+					const content = Swal.getContent();
+					if (content) {
+						const volume = content.querySelector('#volume');
 						volume.innerText = Math.floor(PIXI.sound.volumeAll*100);
-					});
+						const volume_controller = content.querySelector('#swal-volume-settings');
+						volume_controller.value = PIXI.sound.volumeAll;
+						volume_controller.addEventListener("input", function() {
+							PIXI.sound.volumeAll = volume_controller.value;
+							volume.innerText = Math.floor(PIXI.sound.volumeAll*100);
+						});
 
-					const playername = content.querySelector('#playername');
-					playername.value = (localStorage.getItem('playername') || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || 'Player'+random_number();
-					playername.addEventListener("input", function(){
-						let tmp_name = playername.value.replace(/[^\w]/gi, '').trim().substring(0, 15);
-						let name = tmp_name || 'Player'+random_number();
-						playername.value = tmp_name;
-						localStorage.setItem('playername', name);
-						this.playername = name;
-					}.bind(this));
-				}
-			},
+						const playername = content.querySelector('#playername');
+						playername.value = this.playername;
+						playername.addEventListener("input", function(){
+							let tmp_name = playername.value.replace(/[^\w]/gi, '').trim().substring(0, 15);
+							let name = tmp_name || 'Player'+random_number();
+							playername.value = tmp_name;
+							localStorage.setItem('playername', name);
+							this.playername = name;
+						}.bind(this));
+
+						const buttons = content.querySelectorAll('button');
+						let current_preferred_seq_id = this.preferred_seq_id;
+						buttons.forEach(function(button) {
+							let button_preferred_seq_id = parseInt(button.dataset.playerseqid);
+							if (button_preferred_seq_id === current_preferred_seq_id) {
+								button.style.opacity = 1;
+								button.style.outline = "white solid 2px";
+							} else {
+								button.style.opacity = 0.5;
+								button.style.outline = "none";
+							}
+							button.addEventListener("click", function(){
+								localStorage.setItem('preferred_seq_id', button_preferred_seq_id);
+								buttons.forEach(function(btn) {
+									let btn_preferred_seq_id = parseInt(btn.dataset.playerseqid);
+									if (btn_preferred_seq_id === button_preferred_seq_id) {
+										btn.style.opacity = 1;
+										btn.style.outline = "white solid 2px";
+									} else {
+										btn.style.opacity = 0.5;
+										btn.style.outline = "none";
+									}
+								});
+							}.bind(this));
+						}, this);
+					}
+			  },
 			  confirmButtonText: "Looks Great"
 			});
 		}.bind(this));

@@ -114,12 +114,13 @@ input[type=number] {
 	border: none;
 }
 
-
+.playerconfig.w20 {
+	width: 20%;
+}
 
 .slidecontainer {
   width: 100%; /* Width of the outside container */
 }
-
 
 .slider {
   -webkit-appearance: none;

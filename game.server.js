@@ -88,7 +88,7 @@ Server.prototype.randomToken = function(length) {
 	}
 	return result;
 }
-Server.prototype.GetSeqIdForNewPlayerInServer = function() {
+Server.prototype.GetSeqIdForNewPlayerInServer = function(preferred_seq_id) {
 	var seq_id = null;
 	if (this.players === 1) {
 		for (let [key, value] of Object.entries(this.players_data)) {
@@ -99,10 +99,15 @@ Server.prototype.GetSeqIdForNewPlayerInServer = function() {
 			}
 		}
 	} else {
-		for (let [key, value] of Object.entries(this.players_data)) {
-			if (value.id === null) {
-				seq_id = parseInt(key);
-				break;
+		preferred_seq_id = parseInt(preferred_seq_id || 0);
+		if (preferred_seq_id > 0 && preferred_seq_id < 5 && this.players_data[preferred_seq_id].id === null) {
+			seq_id = preferred_seq_id;
+		} else {
+			for (let [key, value] of Object.entries(this.players_data)) {
+				if (value.id === null) {
+					seq_id = parseInt(key);
+					break;
+				}
 			}
 		}
 	}
@@ -191,27 +196,27 @@ Player.prototype.resetTimer = function() {
 	this.clearTimer();
 	this.setTimer();
 }
-Player.prototype.AutoServer = function(playername) {
+Player.prototype.AutoServer = function(playername, preferred_seq_id) {
 	let server_id = _Servers.GetAutoServer();
 	if (server_id === null) {
-		this.HostServer(false, playername);
+		this.HostServer(false, playername, preferred_seq_id);
 	} else {
-		this.JoinServer(server_id, playername);
+		this.JoinServer(server_id, playername, preferred_seq_id);
 	}
 }
-Player.prototype.JoinServer = function(server_id, playername, or_host) {
+Player.prototype.JoinServer = function(server_id, playername, preferred_seq_id, or_host) {
 	this.LeaveServer();
 	server_id = parseInt(server_id);
 	let server = _Servers.ServersList[server_id];
 	if (!server) {
 		if (or_host === true) {
-			this.HostServer(true, playername, server_id);
+			this.HostServer(true, playername, preferred_seq_id, server_id);
 		} else {
 			this.socket.emit('ServerError', 'Table #'+server_id+' does not exist');
 		}
 		return;
 	}
-	let seq_id = server.GetSeqIdForNewPlayerInServer();
+	let seq_id = server.GetSeqIdForNewPlayerInServer(preferred_seq_id);
 
 	if (seq_id && server.players < server.max_players && !server.playing) {
 		this.socket.join(server_id);
@@ -231,7 +236,7 @@ Player.prototype.JoinServer = function(server_id, playername, or_host) {
 		this.socket.emit('ServerError', 'Table #'+server_id+' is not available');
 	}
 }
-Player.prototype.HostServer = function(isPrivate, playername, server_id) {
+Player.prototype.HostServer = function(isPrivate, playername, preferred_seq_id, server_id) {
 	this.LeaveServer();
 	isPrivate = (isPrivate === true) ? true : false;
 	server_id = parseInt(server_id);
@@ -244,7 +249,8 @@ Player.prototype.HostServer = function(isPrivate, playername, server_id) {
 
 	this.socket.join(server_id);
 	this.server = server;
-	this.seq_id = Math.floor(Math.random() * 4) + 1;
+	preferred_seq_id = parseInt(preferred_seq_id || 0);
+	this.seq_id = (preferred_seq_id > 0 && preferred_seq_id < 5) ? preferred_seq_id : Math.floor(Math.random() * 4) + 1;
 	this.server.players_data[this.seq_id].name = (playername || '').replace(/[^\w]/gi, '').trim().substring(0, 15) || "Ghost";
 
 	server.players_data[this.seq_id].id = this.socket.id;
