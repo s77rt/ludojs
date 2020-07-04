@@ -882,7 +882,7 @@ class Game_Control extends PIXI.Container {
 				  showCancelButton: true,
 				  confirmButtonText: 'Send',
 				  inputValidator: (value) => {
-					value = value.replace(/[^\w\s]/gi, '').trim();
+					value = filterXSS(value || '').trim();
 					if (!value) {
 						return 'You need to write something!';
 					} else if (value.length > 128) {
