@@ -647,6 +647,7 @@ class Game {
 							}
 							button.addEventListener("click", function(){
 								localStorage.setItem('preferred_seq_id', button_preferred_seq_id);
+								this.preferred_seq_id = button_preferred_seq_id;
 								buttons.forEach(function(btn) {
 									let btn_preferred_seq_id = parseInt(btn.dataset.playerseqid);
 									if (btn_preferred_seq_id === button_preferred_seq_id) {
