@@ -385,8 +385,10 @@ class Game {
 			}
 			if (this.player_turn === -1) {
 				setTimeout(() => {
-					if (dice.tint === 0x000000)
+					if (dice.tint === 0x000000) {
+						this.setReady();
 						return;
+					}
 					this._chat.addMessage("Game Over", 0);
 					PIXI.Loader.shared.resources.game_over.sound.play();
 					dice.changeColor(0x000000);
@@ -457,6 +459,7 @@ class Game {
 						}
 					});
 					this._localLastServerUpdate = data; // save this data to be used on game resume
+					this.setReady();
 					return;
 				}
 				dice.changeColor(COLOR_MAP[this.player_turn]);
@@ -491,6 +494,7 @@ class Game {
 			PIXI.Loader.shared.resources.notification.sound.play();
 		}
 		this.setReady();
+		return;
 	}
 	onServerError(error) {
 		this.loadMainMenu();
