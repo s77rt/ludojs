@@ -312,7 +312,7 @@ Player.prototype.UpdateGame = function(action) {
 	if (!this.server.playing)
 		return;
 
-	if (this.server.player_turn === this.seq_id && this.server.players_data[this.seq_id].id === this.id && this.server._expected_action === action.action) {
+	if (this.server.player_turn === this.seq_id && this.server.players_data[this.seq_id].id === this.socket.id && this.server._expected_action === action.action) {
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
