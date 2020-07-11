@@ -44,6 +44,8 @@ class Game {
 		this.busy = false; // for smooth updaes
 		this.funqueue = []; // functions queue
 
+		this._server_id = null; // to prevent server events mixup
+
 		this.brand = document.getElementById('brand');
 		this.spinner = new Game_Spinner();
 
@@ -56,14 +58,14 @@ class Game {
 		this._socket.on('HostServer', this.onHostServer.bind(this));
 		this._socket.on('LeaveServer', this.onLeaveServer.bind(this));
 
-		this._socket.on('ServerUpdate', function(data) {
-			this.funqueue.push(function() {this.onServerUpdate(data)}.bind(this));
+		this._socket.on('ServerUpdate', function(id, data) {
+			this.funqueue.push(function() {this.onServerUpdate(id, data)}.bind(this));
 			this.process_funqueue();
 		}.bind(this));
 		this._socket.on('ServerError', this.onServerError.bind(this));
 
-		this._socket.on('GameUpdate', function(data) {
-			this.funqueue.push(function() {this.onGameUpdate(data)}.bind(this));
+		this._socket.on('GameUpdate', function(id, data) {
+			this.funqueue.push(function() {this.onGameUpdate(id, data)}.bind(this));
 			this.process_funqueue();
 		}.bind(this));
 		this._socket.on('GameError', this.onGameError.bind(this));
@@ -287,7 +289,7 @@ class Game {
 		if (this._isLocal) {
 			this.player_turn = Math.floor(Math.random() * 4) + 1;
 			this.NextPlayerTurn();
-			this.onServerUpdate({players_data: {}, playing: true, player_turn: this.player_turn});
+			this.onServerUpdate(1000000000, {players_data: {}, playing: true, player_turn: this.player_turn});
 		} else {
 			this._socket.emit('StartGame');
 		}
@@ -314,7 +316,7 @@ class Game {
 		this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['pause'];
 		this._localPaused = 0;
 		this._chat.addMessage("Game Resumed", 0);
-		this.onServerUpdate(this._localLastServerUpdate);
+		this.onServerUpdate(1000000000, this._localLastServerUpdate);
 	}
 
 	Message(msg) {
@@ -362,10 +364,17 @@ class Game {
 		this.player_turn = null;
 		this.funqueue = [];
 		this.busy = false;
+		this._server_id = null;
 	}
 
-	onServerUpdate(data) {
+	onServerUpdate(id, data) {
 		this.spinner.hide();
+		if (!this._server_id) {
+			this._server_id = id;
+		} else if (this._server_id != id) {
+			this.setReady();
+			return;
+		}
 		this.token = new Math.seedrandom(data.token);
 		for (let [seq_id, player_data] of Object.entries(data.players_data)) {
 			let player = this.Players[seq_id];
@@ -506,7 +515,12 @@ class Game {
 		)
 	}
 
-	onGameUpdate(action) {
+	onGameUpdate(id, action) {
+		this.spinner.hide();
+		if (this._server_id != id) {
+			this.setReady();
+			return;
+		}
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
@@ -695,6 +709,7 @@ class Game {
 	}
 	loadMainMenu() {
 		PIXI.sound.stopAll();
+		this._server_id = null;
 		this._chat.hide();
 		this._chat.reset();
 		this._banner.hide();
@@ -1941,7 +1956,7 @@ class Game_Player {
 			this._game._board._Dice.setInteractive(true);
 		} else if (this._game._isLocal) {
 			this._game.NextPlayerTurn();
-			this._game.onServerUpdate({players_data: {}, playing: true, player_turn: this._game.player_turn});
+			this._game.onServerUpdate(1000000000, {players_data: {}, playing: true, player_turn: this._game.player_turn});
 		}
 	}
 	markMyPieces_as_ineligible() {
@@ -2160,7 +2175,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 				} else {
 					if (this._player._game._isLocal) {
 						this._player._game.NextPlayerTurn();
-						this._player._game.onServerUpdate({players_data: {}, playing: true, player_turn: this._player._game.player_turn});
+						this._player._game.onServerUpdate(1000000000, {players_data: {}, playing: true, player_turn: this._player._game.player_turn});
 					}
 					this._player._game.setReady();
 				}

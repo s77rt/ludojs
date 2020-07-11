@@ -141,8 +141,10 @@ Server.prototype.NextPlayerTurn = function() {
 		this._expected_action = "roll";
 		this.player_turn = next_player;
 		_Players.PlayersList[next_player_id].setTimer();
-	} else {
+	} else if (this.playing === true) {
 		this.player_turn = -1;
+	} else {
+		this.player_turn = null;
 	}
 }
 Server.prototype.updatePlayerPercentage = function(player) {
@@ -230,8 +232,8 @@ Player.prototype.JoinServer = function(server_id, playername, preferred_seq_id, 
 		this.socket.emit('JoinServer', {seq_id: this.seq_id, isPrivate: server._isPrivate});
 		if (server.players === server.max_players)
 			server.StartGame();
-		this.socket.emit('ServerUpdate', server);
-		this.socket.to(server_id).emit('ServerUpdate', server);
+		this.socket.emit('ServerUpdate', server_id, server);
+		this.socket.to(server_id).emit('ServerUpdate', server_id, server);
 	} else {
 		this.socket.emit('ServerError', 'Table #'+server_id+' is not available');
 	}
@@ -259,7 +261,7 @@ Player.prototype.HostServer = function(isPrivate, playername, preferred_seq_id, 
 		SpawnBot(server_id);
 
 	this.socket.emit('HostServer', {seq_id: this.seq_id, isPrivate: isPrivate, server_id: server_id});
-	this.socket.emit('ServerUpdate', server);
+	this.socket.emit('ServerUpdate', server_id, server);
 }
 Player.prototype.LeaveServer = function() {
 	if (!this.server)
@@ -282,7 +284,7 @@ Player.prototype.LeaveServer = function() {
 		if (server.player_turn === this.seq_id) {
 			server.NextPlayerTurn();
 		}
-		this.socket.to(server_id).emit('ServerUpdate', server);
+		this.socket.to(server_id).emit('ServerUpdate', server_id, server);
 		this.socket.leave(server_id);
 	}
 
@@ -300,8 +302,8 @@ Player.prototype.StartGame = function() {
 		this.socket.emit('GameError', "At least two players are required to start the game");
 	} else {
 		this.server.StartGame();
-		this.socket.emit('ServerUpdate', this.server);
-		this.socket.to(this.server.id).emit('ServerUpdate', this.server);
+		this.socket.emit('ServerUpdate', this.server.id, this.server);
+		this.socket.to(this.server.id).emit('ServerUpdate', this.server.id, this.server);
 	}
 }
 Player.prototype.UpdateGame = function(action) {
@@ -310,7 +312,7 @@ Player.prototype.UpdateGame = function(action) {
 	if (!this.server.playing)
 		return;
 
-	if (this.server.player_turn === this.seq_id && this.server._expected_action === action.action) {
+	if (this.server.player_turn === this.seq_id && this.server.players_data[this.seq_id].id === this.id && this.server._expected_action === action.action) {
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
@@ -319,7 +321,7 @@ Player.prototype.UpdateGame = function(action) {
 					return;
 
 				this.server._dice_value = data.number;
-				this.socket.to(this.server.id).emit('GameUpdate', action);
+				this.socket.to(this.server.id).emit('GameUpdate', this.server.id, action);
 				var CanPlay = Object.values(this.server.players_data[this.seq_id].pieces).some((piece) => 
 					((piece === 0 && data.number === 6) || (piece >= 1 && piece + data.number <= 59))
 				);
@@ -333,8 +335,8 @@ Player.prototype.UpdateGame = function(action) {
 					this.clearTimer();
 					this.server._expected_action = "roll";
 					this.server.NextPlayerTurn();
-					this.socket.emit('ServerUpdate', this.server);
-					this.socket.to(this.server.id).emit('ServerUpdate', this.server);
+					this.socket.emit('ServerUpdate', this.server.id, this.server);
+					this.socket.to(this.server.id).emit('ServerUpdate', this.server.id, this.server);
 				}
 				break;
 			case "move":
@@ -384,13 +386,13 @@ Player.prototype.UpdateGame = function(action) {
 					}
 				}
 
-				this.socket.to(this.server.id).emit('GameUpdate', action);
+				this.socket.to(this.server.id).emit('GameUpdate', this.server.id, action);
 				this.server._expected_action = "roll";
 				if ((this.server._dice_value != 6 && c_enemies === 0) || this.server.players_data[this.seq_id].percentage === 100) {
 					this.clearTimer();
 					this.server.NextPlayerTurn();
-					this.socket.emit('ServerUpdate', this.server);
-					this.socket.to(this.server.id).emit('ServerUpdate', this.server);
+					this.socket.emit('ServerUpdate', this.server.id, this.server);
+					this.socket.to(this.server.id).emit('ServerUpdate', this.server.id, this.server);
 				} else {
 					this.resetTimer();
 				}
