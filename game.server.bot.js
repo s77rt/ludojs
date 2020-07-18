@@ -35,6 +35,8 @@ class Bot {
 
 		this.funqueue = [];
 
+		this._server_id = null; // to prevent server events mixup
+
 		this.token = Math.random;
 
 		this._socket = io_client('http://127.0.0.1:'+config.Port);
@@ -55,6 +57,7 @@ class Bot {
 		this._socket.emit('JoinServer', server_id, getRandomName());
 	}
 	LeaveServer() {
+		this._server_id = null;
 		this._socket.emit('LeaveServer');
 	}
 
@@ -73,7 +76,12 @@ class Bot {
 		this.my_seq_id = data.seq_id;
 	}
 
-	onServerUpdate(data) {
+	onServerUpdate(id, data) {
+		if (!this._server_id) {
+			this._server_id = id;
+		} else if (this._server_id != id) {
+			return;
+		}
 		if (data.players === 1 || data.player_turn === -1) {
 			if (this._socket) {
 				this.LeaveServer();
@@ -155,6 +163,7 @@ class Bot {
 		}
 	}
 	onServerError() {
+		this._server_id = null;
 		if (this._socket) {
 			this.LeaveServer();
 			this._socket.disconnect();

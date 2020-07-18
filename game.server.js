@@ -295,10 +295,10 @@ Player.prototype.LeaveServer = function() {
 Player.prototype.StartGame = function() {
 	if (!this.server)
 		return;
-	if (this.server.playing)
-		return;
 
-	if (this.server.players === 1) {
+	if (this.server.playing) {
+		this.socket.emit('ServerUpdate', this.server.id, this.server);
+	} else if (this.server.players === 1) {
 		this.socket.emit('GameError', "At least two players are required to start the game");
 	} else {
 		this.server.StartGame();

@@ -276,6 +276,7 @@ class Game {
 		this._socket.emit('HostServer', isPrivate, this.playername, this.preferred_seq_id);
 	}
 	LeaveServer() {
+		this._server_id = null;
 		this.my_seq_id = 1;
 		this.player_turn = null;
 		this.funqueue = [];
@@ -507,6 +508,7 @@ class Game {
 		return;
 	}
 	onServerError(error) {
+		this._server_id = null;
 		this.loadMainMenu();
 		this.spinner.hide();
 		Swal.fire(
