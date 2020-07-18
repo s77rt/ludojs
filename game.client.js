@@ -375,6 +375,7 @@ class Game {
 			this.setReady();
 			return;
 		}
+		console.log("ServerUpdate", id, data)
 		this.token = new Math.seedrandom(data.token);
 		for (let [seq_id, player_data] of Object.entries(data.players_data)) {
 			let player = this.Players[seq_id];
@@ -521,6 +522,7 @@ class Game {
 			this.setReady();
 			return;
 		}
+		console.log("GameUpdate", id, action)
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
@@ -1432,7 +1434,7 @@ class Game_Board extends PIXI.Container {
 		this._Path_BLUE[58] = {x: round((7*this._BoxSize)+(this._BoxSize/2)), y: round((8*this._BoxSize)+(this._BoxSize/2))};
 	}
 	reset() {
-		this._Dice.value = null;
+		this._Dice._value = null;
 		this._Dice.x = (this.width / 2) - this._BoxSize/2;
 		this._Dice.y = (this.height / 2) - this._BoxSize/2;
 		this._Dice.rotation = 0;
