@@ -43,6 +43,7 @@ class Game {
 		this.player_turn = null;
 		this.busy = false; // for smooth updaes
 		this.funqueue = []; // functions queue
+		this.timeouts = []; // general timeouts of game
 
 		this._server_id = null; // to prevent server events mixup
 
@@ -376,7 +377,7 @@ class Game {
 			this.setReady();
 			return;
 		}
-		console.log("ServerUpdate", id, data)
+		console.log("ServerUpdate", id, data);
 		this.token = new Math.seedrandom(data.token);
 		for (let [seq_id, player_data] of Object.entries(data.players_data)) {
 			let player = this.Players[seq_id];
@@ -395,7 +396,7 @@ class Game {
 				PIXI.Loader.shared.resources.game_started.sound.play();
 			}
 			if (this.player_turn === -1) {
-				setTimeout(() => {
+				this.timeouts.push(setTimeout(() => {
 					if (dice.tint === 0x000000) {
 						this.setReady();
 						return;
@@ -454,7 +455,7 @@ class Game {
 							}
 						});
 					}
-				}, (0.07*6*1000 * 2)); // just to be sure that the last steps are made
+				}, (0.07*6*1000 * 2))); // just to be sure that the last steps are made
 			} else if (this.player_turn > 0 && this.player_turn < 5) {
 				if (this._isLocal && this._localPaused === 1) {
 					this._control._play.texture = PIXI.Loader.shared.resources.icons.textures['play'];
@@ -524,7 +525,7 @@ class Game {
 			this.setReady();
 			return;
 		}
-		console.log("GameUpdate", id, action)
+		console.log("GameUpdate", id, action);
 		let data = action.data;
 		switch(action.action) {
 			case "roll":
@@ -1443,6 +1444,10 @@ class Game_Board extends PIXI.Container {
 		this._Dice.setInteractive(false);
 		this._Dice.changeColor(0xffffff);
 		this._Dice.texture = this._Dice.textures[0];
+		for (var i = 0; i < this._game.timeouts.length; i++) {
+			clearTimeout(this._game.timeouts[i]);
+		}
+		this._game.timeouts = [];
 		Object.values(this._game.Players).forEach(function(player) {
 			player.clearInfo();
 			player.clearTimer();
@@ -1798,7 +1803,7 @@ class Game_Board_Dice extends PIXI.AnimatedSprite {
 			this.custom_scale(1.75);
 		}.bind(this));
 
-		setTimeout(() => {
+		this._board._game.timeouts.push(setTimeout(() => {
 			this.stop();
 			this.texture = PIXI.Loader.shared.resources.dice.textures['dice-'+x+'.png'];
 			PIXI.Loader.shared.resources.rolled_dice.sound.play();
@@ -1809,7 +1814,7 @@ class Game_Board_Dice extends PIXI.AnimatedSprite {
 			if (my_turn === true)
 				this._board._game.Players[this._board._game.my_seq_id].checkMyPieces();
 			this._board._game.setReady();
-		}, 1.1*1000);
+		}, 1.1*1000));
 	}
 	_roll() {
 		this._board._game.Players[this._board._game.my_seq_id].clearTimer();
@@ -2154,13 +2159,13 @@ class Game_Player_Piece extends PIXI.Sprite {
 			dice.setInteractive(true);
 		} else {
 			for (var i = 1; i <= steps; i++) {
-				setTimeout(() => {
+				this._player._game.timeouts.push(setTimeout(() => {
 					PIXI.Loader.shared.resources.move.sound.play();
-				}, 0.07*(i-1)*1000);
+				}, 0.07*(i-1)*1000));
 				this.timeline.to(this, 0.07, this._path[old_pos+i], '>');
 			}
 
-			setTimeout(() => {
+			this._player._game.timeouts.push(setTimeout(() => {
 				if (this._pos === 59) {
 					PIXI.Loader.shared.resources.victory.sound.play();
 				} else if (c_enemies.length) {
@@ -2183,7 +2188,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 					}
 					this._player._game.setReady();
 				}
-			}, 0.07*steps*1000);
+			}, 0.07*steps*1000));
 		}
 	}
 	move_alt(old_pos, new_pos) {
@@ -2205,13 +2210,13 @@ class Game_Player_Piece extends PIXI.Sprite {
 		} else {
 			let steps = new_pos - old_pos;
 			for (var i = 1; i <= steps; i++) {
-				setTimeout(() => {
+				this._player._game.timeouts.push(setTimeout(() => {
 					PIXI.Loader.shared.resources.move.sound.play();
-				}, 0.07*(i-1)*1000);
+				}, 0.07*(i-1)*1000));
 				this.timeline.to(this, 0.07, this._path[old_pos+i], '>');
 			}
 
-			setTimeout(() => {
+			this._player._game.timeouts.push(setTimeout(() => {
 				if (this._pos === 59) {
 					PIXI.Loader.shared.resources.victory.sound.play();
 				} else if (c_enemies.length) {
@@ -2226,7 +2231,7 @@ class Game_Player_Piece extends PIXI.Sprite {
 				this._player.updatePercentage();
 
 				this._player._game.setReady();
-			}, 0.07*steps*1000);
+			}, 0.07*steps*1000));
 		}
 	}
 
