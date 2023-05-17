@@ -4,6 +4,7 @@
   "description": "ludojs is a html5 js game version of the well known game ludo",
   "main": "app.js",
   "scripts": {
+    "build": "cp game.client.js public/js/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
