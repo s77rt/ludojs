@@ -1,3 +1,7 @@
 # ludojs
 
-Use https://obfuscator.io/ (https://www.npmjs.com/package/javascript-obfuscator) to obfuscate the client javascript (with domain restriction)  
+ ![105596936_276408896805264_4053900794469182257_n](https://github.com/s77rt/ludojs/assets/16493223/c24e6a13-3817-4d53-8c91-01a6131f34b0)
+
+![73364111_290879608788771_5085417973466717618_n](https://github.com/s77rt/ludojs/assets/16493223/923e96e5-6b9a-4e1c-9974-1674146d7f9d)
+
+![83320498_718162422089884_5426395312035290888_n](https://github.com/s77rt/ludojs/assets/16493223/bc0bf56a-5492-4d0c-a97e-cc56cbda48d8)
